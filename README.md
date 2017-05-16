@@ -1,2 +1,2 @@
-# cassian
-Cassian Deep Learning System for Inventory Management
+## Cassian
+This is the world's first inventory management system built using deep reinforcement learning. 
