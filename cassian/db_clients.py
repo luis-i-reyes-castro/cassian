@@ -22,66 +22,70 @@ class db_client :
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     def __init__( self, data_source_name) :
+
         self.data_source = data_source_name
         return
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     def read_sql_script( self, sql_script) :
+
         handle = open( sql_script)
         query = handle.read()
         handle.close()
+
         return query
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     def execute_query( self, query, replacements = {}, verbose = False) :
-        # -----------------------------------------------------------------------------
+
         query_to_execute = query
-        # -----------------------------------------------------------------------------
         for key in replacements :
             query_to_execute = query_to_execute.replace( key, replacements[key])
-        # -----------------------------------------------------------------------------
+
         print( self.SEPARATING_LINE )
         print( 'EXECUTING THE FOLLOWING QUERY (SQL SCRIPT):' )
         print( self.SEPARATING_LINE )
         print( query if not verbose else query_to_execute )
         print( self.SEPARATING_LINE )
-        # -----------------------------------------------------------------------------
+
         conexion = pyodbc.connect( 'DSN=' + self.data_source )
-        df = None
-        # -----------------------------------------------------------------------------
+        df       = None
+
         try :
             df = pd.read_sql( query_to_execute, conexion)
             print( 'QUERY EXECUTION SUCCEEDED!' )
         except Exception as some_exception :
             print( 'QUERY EXECUTION FAILED! ERROR MESSAGE:' )
             print( some_exception )
-        # -----------------------------------------------------------------------------
+
         print( self.SEPARATING_LINE )
-        # -----------------------------------------------------------------------------
         conexion.close()
-        # -----------------------------------------------------------------------------
+
         return df
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     def get_table( self, table, limit = None) :
+
         query = 'SELECT * FROM ' + table
         if limit is not None :
             query += ' LIMIT ' + str(limit) + ';'
+
         return self.execute_query( query)
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     def get_columns( self, table) :
+
         df = self.get_table( table, 1)
-        return df.columns.tolist() if df is not None else None
+        return df.columns.tolist()
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     def ensure_directory( self, directory) :
-        # -----------------------------------------------------------------------------
+
         directory += '/' if not directory[-1] == '/' else ''
-        # -----------------------------------------------------------------------------
+
         directory = os.path.dirname( directory + 'non-existent-file.txt' )
         os.makedirs( directory) if not os.path.exists( directory) else None
-        # -----------------------------------------------------------------------------
+
         return
 
 # =====================================================================================
