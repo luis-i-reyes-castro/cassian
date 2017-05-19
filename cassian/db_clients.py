@@ -15,7 +15,7 @@ DIR_RESULT_SET = '/home/luis/Downloads/data_store-[STORE-ID]/'
 RESULT_SET     = 'raw.pkl'
 
 # =====================================================================================
-class db_client :
+class DatabaseClient :
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     SEPARATING_LINE      = '-' * 64

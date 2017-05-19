@@ -77,21 +77,21 @@ class Dataset :
 
         self.categorizer = {}
         self.categorizer['replenished'] = \
-        Timeseries_Categorizer( max_val = self.info_other['REPLENISHED_MAX'].max() )
+        TimeseriesCategorizer( max_val = self.info_other['REPLENISHED_MAX'].max() )
         self.categorizer['returned']    = \
-        Timeseries_Categorizer( max_val = self.info_other['RETURNED_MAX'].max() )
+        TimeseriesCategorizer( max_val = self.info_other['RETURNED_MAX'].max() )
         self.categorizer['trashed']     = \
-        Timeseries_Categorizer( max_val = self.info_other['TRASHED_MAX'].max() )
+        TimeseriesCategorizer( max_val = self.info_other['TRASHED_MAX'].max() )
         self.categorizer['found']       = \
-        Timeseries_Categorizer( max_val = self.info_other['FOUND_MAX'].max() )
+        TimeseriesCategorizer( max_val = self.info_other['FOUND_MAX'].max() )
         self.categorizer['missing']     = \
-        Timeseries_Categorizer( max_val = self.info_other['MISSING_MAX'].max() )
+        TimeseriesCategorizer( max_val = self.info_other['MISSING_MAX'].max() )
 
         self.data = {}
         for sku in self.list_of_skus :
             vec_ = self.vectors.loc[sku]
             ts_  = data_raw['timeseries'][ sku]
-            self.data[sku] = SKU_Data( vector = vec_, timeseries = ts_)
+            self.data[sku] = SkuData( vector = vec_, timeseries = ts_)
             self.data[sku].categorize_ts( self.categorizer)
 
         self.update_num_timesteps_and_list_of_sku_probs()
@@ -224,12 +224,12 @@ class Dataset :
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     def setup_sampler( self, nb_samples, timesteps) :
 
-        self.batch_specs            = Batch_Specs()
+        self.batch_specs            = BatchSpecifications()
         self.batch_specs.nb_samples = nb_samples
         self.batch_specs.timesteps  = timesteps
         self.batch_specs.vec_dim    = self.vec_dim
         self.batch_specs.ts_dim     = self.ts_dim
-        self.batch_sample           = Batch_Sample( self.batch_specs)
+        self.batch_sample           = BatchSample( self.batch_specs)
 
         return
 
@@ -248,7 +248,7 @@ class Dataset :
         return
 
 # =====================================================================================
-class SKU_Data :
+class SkuData :
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     vector        = pd.Series()
@@ -416,7 +416,7 @@ class Sample :
     z_missing     = np.array([])
 
 # =====================================================================================
-class Batch_Specs :
+class BatchSpecifications :
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     nb_samples = 0
@@ -425,7 +425,7 @@ class Batch_Specs :
     ts_dim     = 0
 
 # =====================================================================================
-class Batch_Sample :
+class BatchSample :
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     X_vec         = np.array([])
@@ -495,7 +495,7 @@ class Batch_Sample :
         return
 
 # =====================================================================================
-class Timeseries_Categorizer :
+class TimeseriesCategorizer :
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     bins           = []
