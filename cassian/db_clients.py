@@ -220,14 +220,8 @@ class DatabaseClient :
             difference.loc[ rows__] = 0
 
             if pd.Series.any( difference != 0 ) :
-                msg = 'Warning: Inconsistent timeseries for SKU '
+                msg = 'Notice: Inconsistencies in timeseries for SKU '
                 print( msg + str(sku) )
-
-        assert pd.Series.all( df['STOCK_LIMIT'] >= 0 )
-        assert pd.Series.all( df['IS_ON_SALE'].isin( [ '0', '1'] ) )
-        assert pd.Series.all( df['UNIT_PRICE'] >= 0.0 )
-        assert pd.Series.all( df['UNIT_UTILITY'] >= 0.0 )
-        assert pd.Series.all( df['UNIT_COST'] >= 0.0 )
 
         df = df.asfreq('D')
 
@@ -424,8 +418,6 @@ class DatabaseClient :
             sku_df = df[ df['SKU_A'] == sku ]
             if len( sku_df ) >= min_num_of_records + 1 :
                 self.sku_timeseries[ sku] = self.process_sku_timeseries( sku_df)
-                if self.sku_timeseries[ sku] is None :
-                    del self.sku_timeseries[ sku]
 
         script = SCRIPT.replace( '[PHASE]', '3')
         query = self.read_sql_script( script)
