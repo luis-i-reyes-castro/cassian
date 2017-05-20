@@ -98,8 +98,24 @@ class DatabaseClient :
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     def get_store_roster( self) :
 
-        query = 'SELECT * FROM DW_SUCURSAL_DIM'
-        return self.execute_query( query)
+        query   = 'SELECT * FROM DW_SUCURSAL_DIM' + '\n'
+        df      = self.execute_query( query)
+        columns = [ 'COD_SUCURSAL', 'NOM_SUCURSAL', 'FORMATO', 'TIPO',
+                    'CIUDAD', 'FECHA_APERTURA' ]
+        df      = df[columns]
+
+        replace = { 'COD_SUCURSAL' : 'ID',
+                    'NOM_SUCURSAL' : 'NAME',
+                    'FORMATO' : 'FORMAT',
+                    'TIPO'  : 'TYPE',
+                    'CIUDAD' : 'CITY',
+                    'FECHA_APERTURA' : 'OPENING_DATE' }
+        df.rename( columns = replace, inplace = True)
+        df.sort_values( by = 'ID', inplace = True)
+
+        df.to_csv( 'store-roster.csv', index = False)
+
+        return
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     def get_info_for_SKU( self, argument) :
@@ -109,6 +125,7 @@ class DatabaseClient :
             query += 'COD_ESTADISTICO IN ' + str( tuple(argument) )
         else :
             query += 'COD_ESTADISTICO = ' + str(argument)
+        query += '\n'
 
         return self.execute_query( query)
 
@@ -123,7 +140,7 @@ class DatabaseClient :
         else :
             query += 'FC_COD_ESTADISTICO = ' + str(argument)
 
-        query += ' ORDER BY FC_COD_ESTADISTICO, FC_FECHA'
+        query += ' ORDER BY FC_COD_ESTADISTICO, FC_FECHA' + '\n'
 
         return self.execute_query( query)
 
