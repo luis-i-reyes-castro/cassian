@@ -11,14 +11,13 @@ from .convenience import serialize
 
 # =====================================================================================
 SCRIPT         = 'cassian/sql_scripts/tia-netezza_phase-[PHASE].sql'
-DIR_RESULT_SET = '/home/luis/Downloads/data_store-[STORE-ID]/'
+DIR_RESULT_SET = '/home/luis/cassian/dataset-[STORE-ID]/'
 RESULT_SET     = 'raw.pkl'
 
 # =====================================================================================
 class DatabaseClient :
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-    SEPARATING_LINE      = '-' * 64
     sku_timeseries       = None
     sku_information      = None
     sku_info_description = None
@@ -50,23 +49,18 @@ class DatabaseClient :
         for key in replacements :
             query_to_execute = query_to_execute.replace( key, replacements[key])
 
-        print( self.SEPARATING_LINE )
-        print( 'EXECUTING THE FOLLOWING QUERY (SQL SCRIPT):' )
-        print( self.SEPARATING_LINE )
-        print( query if not verbose else query_to_execute )
-        print( self.SEPARATING_LINE )
+        print( 'Executing the following query (SQL script):' )
+        print( query if not verbose else query_to_execute, end = '' )
 
         conexion = pyodbc.connect( 'DSN=' + self.data_source )
         df       = None
 
         try :
             df = pd.read_sql( query_to_execute, conexion)
-            print( 'QUERY EXECUTION SUCCEEDED!' )
+            print( 'Query execution was successful!' )
         except Exception as some_exception :
-            print( 'QUERY EXECUTION FAILED! ERROR MESSAGE:' )
-            print( some_exception )
+            print( 'QUERY execution failed! Error message:', some_exception)
 
-        print( self.SEPARATING_LINE )
         conexion.close()
 
         return df
@@ -90,9 +84,14 @@ class DatabaseClient :
     def ensure_directory( self, directory) :
 
         directory += '/' if not directory[-1] == '/' else ''
+        directory = os.path.dirname( directory + 'dummy-filename.txt' )
 
-        directory = os.path.dirname( directory + 'non-existent-file.txt' )
-        os.makedirs( directory) if not os.path.exists( directory) else None
+        if not os.path.exists( directory) :
+            print( 'Did not find directory', directory)
+            print( 'Creating directory:', directory)
+            os.makedirs( directory)
+
+        print( 'Saving data to directory:', directory)
 
         return
 
@@ -221,7 +220,7 @@ class DatabaseClient :
             difference.loc[ rows__] = 0
 
             if pd.Series.any( difference != 0 ) :
-                msg = 'WARNING: Inconsistent timeseries for SKU '
+                msg = 'Warning: Inconsistent timeseries for SKU '
                 print( msg + str(sku) )
 
         assert pd.Series.all( df['STOCK_LIMIT'] >= 0 )
@@ -396,9 +395,7 @@ class DatabaseClient :
     def download_data( self, intro_year_limit, min_num_of_records) :
 
         def print_phase_message( phase) :
-            print( self.SEPARATING_LINE )
-            print( 'DOWNLOADING DATA - PHASE ' + str(phase) )
-            print( self.SEPARATING_LINE )
+            print( 'Downloading Data - Phase ' + str(phase) )
 
         script = SCRIPT.replace( '[PHASE]', '1')
         query = self.read_sql_script( script)
