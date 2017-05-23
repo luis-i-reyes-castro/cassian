@@ -96,13 +96,13 @@ class DatabaseClient :
         return
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-    def get_store_roster( self) :
+    def get_list_of_stores( self) :
 
-        query   = 'SELECT * FROM DW_SUCURSAL_DIM' + '\n'
+        print( 'Downloading list of stores...' )
+
+        query   = 'SELECT COD_SUCURSAL, NOM_SUCURSAL, FORMATO, TIPO, ' + \
+                  'CIUDAD, FECHA_APERTURA FROM DW_SUCURSAL_DIM' + '\n'
         df      = self.execute_query( query)
-        columns = [ 'COD_SUCURSAL', 'NOM_SUCURSAL', 'FORMATO', 'TIPO',
-                    'CIUDAD', 'FECHA_APERTURA' ]
-        df      = df[columns]
 
         replace = { 'COD_SUCURSAL' : 'ID',
                     'NOM_SUCURSAL' : 'NAME',
@@ -110,10 +110,12 @@ class DatabaseClient :
                     'TIPO'  : 'TYPE',
                     'CIUDAD' : 'CITY',
                     'FECHA_APERTURA' : 'OPENING_DATE' }
+
         df.rename( columns = replace, inplace = True)
         df.sort_values( by = 'ID', inplace = True)
 
-        df.to_csv( 'store-roster.csv', index = False)
+        print( 'Saving data to file list-of-stores.csv.' )
+        df.to_csv( 'list-of-stores.csv', index = False)
 
         return
 
@@ -406,7 +408,8 @@ class DatabaseClient :
     def download_data( self, intro_year_limit, min_num_of_records) :
 
         def print_phase_message( phase) :
-            print( 'Downloading Data - Phase ' + str(phase) )
+            print( 'Downloading Data for Store ID ' + str( self.store_id) + \
+                   ' - Phase ' + str(phase) )
 
         script = SCRIPT.replace( '[PHASE]', '1')
         query = self.read_sql_script( script)
