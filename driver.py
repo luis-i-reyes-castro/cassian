@@ -1,22 +1,15 @@
-import numpy as np
+from cassian.data_management import Dataset
 #from keras.layers import Input
 #from keras.models import Model
-from cassian.db_clients import DatabaseClient
-from cassian.data_management import Dataset
 #from cassian.layers import VectorDependentGatedRNN
-from cassian.models import CassianModel
+#from cassian.models import CassianModel
+#import numpy as np
 
 # -------------------------------------------------------------------------------------
-client = DatabaseClient( store_id = 101)
-client.get_store_roster()
-#df2 = client.get_table( 'DW_ESTADISTICO_DIM', 100)
-#client.download_data( intro_year_limit = 2015, min_num_of_records = 180)
+ds = Dataset( store_id = 101)
+ds.save()
 
-# -------------------------------------------------------------------------------------
-#ds = Dataset( store_id = 308)
-#ds.save()
-
-#ds = Dataset.load( store_id = 308)
+#ds = Dataset.load( store_id = 101)
 #ds.setup_sampler( nb_samples = 16, timesteps = 90)
 #ds.sample_batch()
 #
