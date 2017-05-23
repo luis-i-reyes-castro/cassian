@@ -222,13 +222,20 @@ class Dataset :
         return ( dataset_objects[0], dataset_objects[1])
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-    def setup_sampler( self, nb_samples, timesteps) :
+    def setup_sampler( self, batch_size, timesteps) :
 
         self.batch_specs            = BatchSpecifications()
-        self.batch_specs.nb_samples = nb_samples
+        self.batch_specs.batch_size = batch_size
         self.batch_specs.timesteps  = timesteps
         self.batch_specs.vec_dim    = self.vec_dim
         self.batch_specs.ts_dim     = self.ts_dim
+
+        self.batch_specs.ts_replenished_dim = self.ts_replenished_dim
+        self.batch_specs.ts_returned_dim    = self.ts_returned_dim
+        self.batch_specs.ts_trashed_dim     = self.ts_trashed_dim
+        self.batch_specs.ts_found_dim       = self.ts_found_dim
+        self.batch_specs.ts_missing_dim     = self.ts_missing_dim
+
         self.batch_sample           = BatchSample( self.batch_specs)
 
         return
@@ -238,7 +245,7 @@ class Dataset :
 
         batch_skus = np.random.choice( a = self.list_of_skus,
                                        p = self.list_of_sku_probs,
-                                       size = self.batch_specs.nb_samples)
+                                       size = self.batch_specs.batch_size)
 
         for ( i, sku) in enumerate( batch_skus ) :
             self.data[ sku].sample( sample_obj = self.batch_sample.sample_obj,
@@ -419,10 +426,15 @@ class Sample :
 class BatchSpecifications :
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-    nb_samples = 0
-    timesteps  = 0
-    vec_dim    = 0
-    ts_dim     = 0
+    batch_size         = 0
+    timesteps          = 0
+    vec_dim            = 0
+    ts_dim             = 0
+    ts_replenished_dim = 0
+    ts_returned_dim    = 0
+    ts_trashed_dim     = 0
+    ts_found_dim       = 0
+    ts_missing_dim     = 0
 
 # =====================================================================================
 class BatchSample :
@@ -440,19 +452,16 @@ class BatchSample :
     sample_obj    = Sample()
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-    def __init__( self, batch_specs = None) :
+    def __init__( self, batch_specs) :
 
-        if batch_specs is None:
-            return
-
-        self.X_vec = np.zeros( ( batch_specs.nb_samples,
+        self.X_vec = np.zeros( ( batch_specs.batch_size,
                                  batch_specs.vec_dim),
                                  dtype = 'float32')
-        self.X_ts = np.zeros( ( batch_specs.nb_samples,
+        self.X_ts = np.zeros( ( batch_specs.batch_size,
                                 batch_specs.timesteps, batch_specs.ts_dim),
                                 dtype = 'float32')
 
-        empty_output_tensor = np.zeros( ( batch_specs.nb_samples,
+        empty_output_tensor = np.zeros( ( batch_specs.batch_size,
                                           batch_specs.timesteps, 1) )
 
         empty_output_tensor = empty_output_tensor.astype('float32')

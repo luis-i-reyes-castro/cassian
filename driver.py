@@ -1,19 +1,19 @@
 from cassian.data_management import Dataset
-#from keras.layers import Input
-#from keras.models import Model
-#from cassian.layers import VectorDependentGatedRNN
-#from cassian.models import CassianModel
-#import numpy as np
+from keras.layers import Input
+from keras.models import Model
+from cassian.layers import VectorDependentGatedRNN
+from cassian.models import CassianModel
+import numpy as np
 
 # -------------------------------------------------------------------------------------
-ds = Dataset( store_id = 101)
-ds.save()
+#dataset = Dataset( store_id = 101)
+#dataset.save()
 
-#ds = Dataset.load( store_id = 101)
-#ds.setup_sampler( nb_samples = 16, timesteps = 90)
-#ds.sample_batch()
-#
-#ds_dic = ds.__dict__
+dataset = Dataset.load( store_id = 101)
+dataset.setup_sampler( batch_size = 32, timesteps = 90)
+dataset.sample_batch()
+
+dataset_dic = dataset.__dict__
 
 # -------------------------------------------------------------------------------------
 #X_vec = Input( batch_shape = ( 10, 32) )
@@ -37,8 +37,6 @@ ds.save()
 #model.summary()
 
 # -------------------------------------------------------------------------------------
-#cass = CassianModel( vector_input_dim = 172,
-#                     timeseries_input_dim = 15,
-#                     replenished_dim = 40)
-#cass.plot_model()
-#cass.model.summary()
+cass = CassianModel( dataset.batch_specs)
+cass.plot_model()
+cass.model.summary()
