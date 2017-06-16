@@ -11,9 +11,9 @@ import numpy as np
 
 dataset = Dataset.load( store_id = 101)
 dataset.setup_sampler( batch_size = 32, timesteps = 90)
-dataset.sample_batch()
 
-dataset_dic = dataset.__dict__
+dataset_dict = dataset.as_dictionary()
+batch = dataset.sample_batch()
 
 # -------------------------------------------------------------------------------------
 #X_vec = Input( batch_shape = ( 10, 32) )
@@ -37,6 +37,6 @@ dataset_dic = dataset.__dict__
 #model.summary()
 
 # -------------------------------------------------------------------------------------
-cass = CassianModel( dataset.batch_specs)
-cass.plot_model()
-cass.model.summary()
+#cass = CassianModel( dataset.batch_specs)
+#cass.plot_model()
+#cass.model.summary()

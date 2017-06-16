@@ -111,6 +111,11 @@ class Dataset :
         return
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+    def as_dictionary( self) :
+
+        return self.__dict__
+
+    # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     def save( self) :
 
         filename = INPUT_DIR.replace( '[STORE-ID]', str(self.store_id))
@@ -236,7 +241,7 @@ class Dataset :
         self.batch_specs.ts_found_dim       = self.ts_found_dim
         self.batch_specs.ts_missing_dim     = self.ts_missing_dim
 
-        self.batch_sample           = BatchSample( self.batch_specs)
+        self.batch_sample = BatchSample( self.batch_specs)
 
         return
 
@@ -247,12 +252,58 @@ class Dataset :
                                        p = self.list_of_sku_probs,
                                        size = self.batch_specs.batch_size)
 
-        for ( i, sku) in enumerate( batch_skus ) :
-            self.data[ sku].sample( sample_obj = self.batch_sample.sample_obj,
-                                    timesteps = self.batch_specs.timesteps)
-            self.batch_sample.copy_sample_obj_into_pos(i)
+        for sku in batch_skus :
+            ( inputs, targets) = self.data[sku].sample( self.batch_specs.timesteps)
+            self.batch_sample.include_sample( inputs, targets)
+
+        return self.batch_sample()
+
+# =====================================================================================
+class TimeseriesCategorizer :
+
+    # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+    bins           = []
+    categories     = []
+    num_categories = 0
+
+    # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+    def __init__( self, max_val = 12) :
+
+        self.bins       = [ -1, 0, 1, 2, 3, 4, 5, 6, 8, 10, 12 ]
+        increment_steps = 6
+        increment_value = 12
+
+        while self.bins[-1] < max_val :
+
+            for _ in range( increment_steps) :
+                self.bins.append( self.bins[-1] + increment_value )
+                if self.bins[-1] >= max_val :
+                    break
+
+            increment_value *= 2
+
+        self.categories     = self.bins[1:]
+        self.num_categories = len( self.categories )
 
         return
+
+    # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+    def get_copy( self) :
+
+        return cp.deepcopy(self)
+
+    # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+    def categorize( self, input_ts) :
+
+        categorical_ts = pd.cut( pd.Series( input_ts[:,0] ), bins = self.bins)
+        integer_vector = categorical_ts.cat.codes
+        integer_vector = integer_vector.as_matrix().astype('uint32')
+        return integer_vector[ :, None]
+
+    # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+    def get_category_at_index( self, index) :
+
+        return self.categories[index]
 
 # =====================================================================================
 class SkuData :
@@ -380,47 +431,25 @@ class SkuData :
         return
 
     # =---=---=---=---=---=---=---=---=---=---=---=---=---=---=---=---=---=---=---=---=
-    def sample( self, sample_obj, timesteps) :
+    def sample( self, timesteps) :
 
         i_start = np.random.randint( self.num_timesteps - timesteps )
         i_end   = i_start + timesteps
 
-        np.copyto( dst = sample_obj.x_vec, src = self.vec )
-        np.copyto( dst = sample_obj.x_ts, src = self.ts[ i_start : i_end, :] )
+        inputs = ( self.vec, self.ts[ i_start : i_end, :] )
 
         i_start += 1
         i_end   += 1
 
-        np.copyto( dst = sample_obj.y_sold,
-                   src = self.ts_sold[ i_start : i_end, :] )
-        np.copyto( dst = sample_obj.y_is_on_sale,
-                   src = self.ts_is_on_sale[ i_start : i_end, :] )
-        np.copyto( dst = sample_obj.z_replenished,
-                   src = self.ts_replenished_cat[ i_start : i_end, :] )
-        np.copyto( dst = sample_obj.z_returned,
-                   src = self.ts_returned_cat[ i_start : i_end, :] )
-        np.copyto( dst = sample_obj.z_trashed,
-                   src = self.ts_trashed_cat[ i_start : i_end, :] )
-        np.copyto( dst = sample_obj.z_found,
-                   src = self.ts_found_cat[ i_start : i_end, :] )
-        np.copyto( dst = sample_obj.z_missing,
-                   src = self.ts_missing_cat[ i_start : i_end, :] )
+        targets = ( self.ts_sold[ i_start : i_end, :],
+                    self.ts_is_on_sale[ i_start : i_end, :],
+                    self.ts_replenished_cat[ i_start : i_end, :],
+                    self.ts_returned_cat[ i_start : i_end, :],
+                    self.ts_trashed_cat[ i_start : i_end, :],
+                    self.ts_found_cat[ i_start : i_end, :],
+                    self.ts_missing_cat[ i_start : i_end, :] )
 
-        return
-
-# =====================================================================================
-class Sample :
-
-    # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-    x_vec         = np.array([])
-    x_ts          = np.array([])
-    y_sold        = np.array([])
-    y_is_on_sale  = np.array([])
-    z_replenished = np.array([])
-    z_returned    = np.array([])
-    z_trashed     = np.array([])
-    z_found       = np.array([])
-    z_missing     = np.array([])
+        return ( inputs, targets)
 
 # =====================================================================================
 class BatchSpecifications :
@@ -440,6 +469,8 @@ class BatchSpecifications :
 class BatchSample :
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+    size          = 0
+    index         = 0
     X_vec         = np.array([])
     X_ts          = np.array([])
     Y_sold        = np.array([])
@@ -449,10 +480,12 @@ class BatchSample :
     Z_trashed     = np.array([])
     Z_found       = np.array([])
     Z_missing     = np.array([])
-    sample_obj    = Sample()
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     def __init__( self, batch_specs) :
+
+        self.size  = batch_specs.batch_size
+        self.index = 0
 
         self.X_vec = np.zeros( ( batch_specs.batch_size,
                                  batch_specs.vec_dim),
@@ -468,84 +501,39 @@ class BatchSample :
         self.Y_sold         = empty_output_tensor.copy()
         self.Y_is_on_sale   = empty_output_tensor.copy()
 
-        empty_output_tensor = empty_output_tensor.astype('uint32')
+        empty_output_tensor = empty_output_tensor.astype('int32')
         self.Z_replenished  = empty_output_tensor.copy()
         self.Z_returned     = empty_output_tensor.copy()
         self.Z_trashed      = empty_output_tensor.copy()
         self.Z_found        = empty_output_tensor.copy()
         self.Z_missing      = empty_output_tensor.copy()
 
-        self.sample_obj               = Sample()
-        self.sample_obj.x_vec         = self.X_vec[0]
-        self.sample_obj.x_ts          = self.X_ts[0]
-        self.sample_obj.y_sold        = self.Y_sold[0]
-        self.sample_obj.y_is_on_sale  = self.Y_is_on_sale[0]
-        self.sample_obj.z_replenished = self.Z_replenished[0]
-        self.sample_obj.z_returned    = self.Z_returned[0]
-        self.sample_obj.z_trashed     = self.Z_trashed[0]
-        self.sample_obj.z_found       = self.Z_found[0]
-        self.sample_obj.z_missing     = self.Z_missing[0]
-
         return
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-    def copy_sample_obj_into_pos( self, index) :
+    def __call__( self) :
 
-        self.X_vec[ index, :]            = self.sample_obj.x_vec
-        self.X_ts[ index, :, :]          = self.sample_obj.x_ts
-        self.Y_sold[ index, :, :]        = self.sample_obj.y_sold
-        self.Y_is_on_sale[ index, :, :]  = self.sample_obj.y_is_on_sale
-        self.Z_replenished[ index, :, :] = self.sample_obj.z_replenished
-        self.Z_returned[ index, :, :]    = self.sample_obj.z_returned
-        self.Z_trashed[ index, :, :]     = self.sample_obj.z_trashed
-        self.Z_found[ index, :, :]       = self.sample_obj.z_found
-        self.Z_missing[ index, :, :]     = self.sample_obj.z_missing
+        inputs  = ( self.X_vec, self.X_ts )
+        targets = ( self.Y_sold, self.Y_is_on_sale,
+                    self.Z_replenished, self.Z_returned, self.Z_trashed,
+                    self.Z_found, self.Z_missing )
+
+        return ( inputs, targets)
+
+    # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+    def include_sample( self, inputs, targets) :
+
+        self.X_vec[ self.index, :]   = inputs[0]
+        self.X_ts[ self.index, :, :] = inputs[1]
+
+        self.Y_sold[ self.index, :, :]        = targets[0]
+        self.Y_is_on_sale[ self.index, :, :]  = targets[1]
+        self.Z_replenished[ self.index, :, :] = targets[2]
+        self.Z_returned[ self.index, :, :]    = targets[3]
+        self.Z_trashed[ self.index, :, :]     = targets[4]
+        self.Z_found[ self.index, :, :]       = targets[5]
+        self.Z_missing[ self.index, :, :]     = targets[6]
+
+        self.index = ( self.index + 1 ) % self.size
 
         return
-
-# =====================================================================================
-class TimeseriesCategorizer :
-
-    # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-    bins           = []
-    categories     = []
-    num_categories = 0
-
-    # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-    def __init__( self, max_val = 12) :
-
-        self.bins       = [ -1, 0, 1, 2, 3, 4, 5, 6, 8, 10, 12 ]
-        increment_steps = 6
-        increment_value = 12
-
-        while self.bins[-1] < max_val :
-
-            for _ in range( increment_steps) :
-                self.bins.append( self.bins[-1] + increment_value )
-                if self.bins[-1] >= max_val :
-                    break
-
-            increment_value *= 2
-
-        self.categories     = self.bins[1:]
-        self.num_categories = len( self.categories )
-
-        return
-
-    # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-    def get_copy( self) :
-
-        return cp.deepcopy(self)
-
-    # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-    def categorize( self, input_ts) :
-
-        categorical_ts = pd.cut( pd.Series( input_ts[:,0] ), bins = self.bins)
-        integer_vector = categorical_ts.cat.codes
-        integer_vector = integer_vector.as_matrix().astype('uint32')
-        return integer_vector[ :, None]
-
-    # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-    def get_category_at_index( self, index) :
-
-        return self.categories[index]
