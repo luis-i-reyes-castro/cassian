@@ -296,13 +296,13 @@ class DatabaseClient :
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     def select_sections( self) :
 
-        df = self.generate_section_report(0)
+        df = self.count_skus_per_section( level = 0)
         sections_l0 = df[ df['NUM_SKU'] >= 10 ]['SECTION_L0'].tolist()
 
-        df = self.generate_section_report(1)
+        df = self.count_skus_per_section( level = 1)
         sections_l1 = df[ df['NUM_SKU'] >= 10 ]['SECTION_L1'].tolist()
 
-        df = self.generate_section_report(2)
+        df = self.count_skus_per_section( level = 2)
         sections_l2 = df[ df['NUM_SKU'] >= 10 ]['SECTION_L2'].tolist()
 
         return ( sections_l0, sections_l1, sections_l2)
