@@ -4,8 +4,22 @@
 
 import matplotlib.pyplot as plt
 import numpy as np
+import os
 import pandas as pd
 import pickle
+
+# -------------------------------------------------------------------------------------
+def ensure_directory( directory) :
+
+    directory += '/' if not directory[-1] == '/' else ''
+    directory = os.path.dirname( directory + 'dummy-filename.txt' )
+
+    if not os.path.exists( directory) :
+        print( 'Did not find directory', directory)
+        print( 'Creating directory:', directory)
+        os.makedirs( directory)
+
+    return
 
 # -------------------------------------------------------------------------------------
 def serialize( object_to_serialize, filename) :

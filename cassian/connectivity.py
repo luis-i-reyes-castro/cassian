@@ -4,9 +4,9 @@
 
 # =====================================================================================
 import numpy as np
-import os
 import pandas as pd
 import pyodbc
+from .convenience import ensure_directory
 from .convenience import serialize
 
 # =====================================================================================
@@ -103,7 +103,7 @@ class DatabaseClient :
     def fetch_data( self, intro_year_limit, min_num_of_records) :
 
         def print_phase_message( phase) :
-            print( 'Downloading data for Store ID ' + str( self.store_id) + \
+            print( 'Fetching data for Store ID ' + str( self.store_id) + \
                    ' - Phase ' + str(phase) )
 
         def assert_active_sku( group_of_rows) :
@@ -175,9 +175,11 @@ class DatabaseClient :
         data_object['info-other']       = self.sku_info_other
 
         output_dir = DIR_RESULT_SET.replace( '[STORE-ID]', str( self.store_id))
-        self.ensure_directory( output_dir)
+        ensure_directory( output_dir)
 
-        serialize( data_object, output_dir + RESULT_SET)
+        output_file = output_dir + RESULT_SET
+        print( 'Saving data to file:', output_file)
+        serialize( data_object, output_file)
 
         return
 
@@ -446,18 +448,3 @@ class DatabaseClient :
             df[ col + '_y' ].astype( np.dtype('float32'), copy = False)
 
         return df
-
-    # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-    def ensure_directory( self, directory) :
-
-        directory += '/' if not directory[-1] == '/' else ''
-        directory = os.path.dirname( directory + 'dummy-filename.txt' )
-
-        if not os.path.exists( directory) :
-            print( 'Did not find directory', directory)
-            print( 'Creating directory:', directory)
-            os.makedirs( directory)
-
-        print( 'Saving data to directory:', directory)
-
-        return

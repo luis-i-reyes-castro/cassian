@@ -6,10 +6,12 @@
 import copy as cp
 import numpy as np
 import pandas as pd
+from sklearn.model_selection import train_test_split
+
 from .connectivity import DIR_RESULT_SET
 from .connectivity import RESULT_SET
+from .convenience import ensure_directory
 from .convenience import serialize, de_serialize
-from sklearn.model_selection import train_test_split
 
 # =====================================================================================
 INPUT_DIR = DIR_RESULT_SET
@@ -61,6 +63,9 @@ class Dataset :
     def __init__( self, store_id = 101) :
 
         self.store_id = store_id
+
+        print( 'Fetching data for Store ID ' + str(self.store_id) + ' - Phase 4' )
+        print( 'Building dataset object and discretizing outputs... ' )
 
         filename = INPUT_DIR.replace( '[STORE-ID]', str(self.store_id))
         filename += INPUT_FILE
@@ -118,9 +123,13 @@ class Dataset :
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     def save( self) :
 
-        filename = INPUT_DIR.replace( '[STORE-ID]', str(self.store_id))
-        filename += OUTPUT_FILE
-        serialize( self, filename)
+        output_directory = INPUT_DIR.replace( '[STORE-ID]', str(self.store_id))
+        ensure_directory( output_directory)
+
+        output_file = output_directory + OUTPUT_FILE
+        print( 'Saving data to file:', output_file)
+        serialize( self, output_file)
+
         return
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
