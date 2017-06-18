@@ -1,5 +1,5 @@
 import sys, getopt
-from cassian.db_clients import DatabaseClient
+from cassian.connectivity import DatabaseClient
 
 def show_usage() :
     print( 'Stage-01 Script - Usage:' )
@@ -22,7 +22,7 @@ def main(argv):
             client.get_list_of_stores()
         elif opt in ( '-s', '--store') :
             client = DatabaseClient( store_id = int(arg) )
-            client.download_data( intro_year_limit = 2015, min_num_of_records = 180)
+            client.fetch_data( intro_year_limit = 2015, min_num_of_records = 180)
 
 if __name__ == "__main__":
     main( sys.argv[1:] )
