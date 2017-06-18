@@ -6,8 +6,8 @@
 import copy as cp
 import numpy as np
 import pandas as pd
-from .db_clients import DIR_RESULT_SET
-from .db_clients import RESULT_SET
+from .connectivity import DIR_RESULT_SET
+from .connectivity import RESULT_SET
 from .convenience import serialize, de_serialize
 from sklearn.model_selection import train_test_split
 
