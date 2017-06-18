@@ -257,15 +257,22 @@ class Dataset :
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     def sample_batch( self) :
 
-        batch_skus = np.random.choice( a = self.list_of_skus,
-                                       p = self.list_of_sku_probs,
-                                       size = self.batch_specs.batch_size)
+        while True :
 
-        for sku in batch_skus :
-            ( inputs, targets) = self.data[sku].sample( self.batch_specs.timesteps)
-            self.batch_sample.include_sample( inputs, targets)
+            batch_skus = np.random.choice( a = self.list_of_skus,
+                                           p = self.list_of_sku_probs,
+                                           size = self.batch_specs.batch_size)
 
-        return self.batch_sample()
+            for sku in batch_skus :
+
+                ( inputs, targets) = \
+                self.data[sku].sample( self.batch_specs.timesteps)
+
+                self.batch_sample.include_sample( inputs, targets)
+
+            yield ( self.batch_sample.inputs, self.batch_sample.targets)
+
+        return
 
 # =====================================================================================
 class TimeseriesCategorizer :
@@ -463,7 +470,6 @@ class SkuData :
 # =====================================================================================
 class BatchSpecifications :
 
-    # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     batch_size         = 0
     timesteps          = 0
     vec_dim            = 0
@@ -517,17 +523,12 @@ class BatchSample :
         self.Z_found        = empty_output_tensor.copy()
         self.Z_missing      = empty_output_tensor.copy()
 
+        self.inputs  = ( self.X_vec, self.X_ts )
+        self.targets = ( self.Y_sold, self.Y_is_on_sale,
+                         self.Z_replenished, self.Z_returned, self.Z_trashed,
+                         self.Z_found, self.Z_missing )
+
         return
-
-    # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-    def __call__( self) :
-
-        inputs  = ( self.X_vec, self.X_ts )
-        targets = ( self.Y_sold, self.Y_is_on_sale,
-                    self.Z_replenished, self.Z_returned, self.Z_trashed,
-                    self.Z_found, self.Z_missing )
-
-        return ( inputs, targets)
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     def include_sample( self, inputs, targets) :

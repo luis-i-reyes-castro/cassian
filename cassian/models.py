@@ -34,6 +34,8 @@ class CassianModel :
         self.learnable_layers = []
         self.outputs_list     = []
         self.loss_functions   = {}
+        self.steps_per_epoch  = dataset.num_timesteps \
+                              % ( self.specs.batch_size * self.specs.timesteps )
 
         # -----------------------------------------------------------------------------
         # Builds the input layers and the dimensionality reduction layer
@@ -133,7 +135,32 @@ class CassianModel :
         return
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+    def as_dictionary( self) :
+
+        return self.__dict__
+
+    # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+    def copy_weights( self, original_cassian) :
+
+        for layer in self.learnable_layers :
+
+            original_weights = original_cassian.model.get_layer(layer).get_weights()
+            self.model.get_layer(layer).set_weights( original_weights )
+
+        return
+
+    # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     def plot_model( self, filename = 'Cassian.png') :
 
         return plot_model( model = self.model,
                            show_shapes = True, to_file = filename)
+
+    # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+    def train_on_dataset( self, epochs = 1) :
+
+        self.model.fit_generator( generator = self.dataset.sample_batch,
+                                  steps_per_epoch = self.steps_per_epoch,
+                                  epochs = epochs,
+                                  verbose = 2)
+
+        return

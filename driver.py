@@ -1,7 +1,4 @@
 from cassian.data_management import Dataset
-from keras.layers import Input
-from keras.models import Model
-from cassian.layers import VectorDependentGatedRNN
 from cassian.models import CassianModel
 import numpy as np
 
@@ -12,5 +9,8 @@ dataset.setup_sampler( batch_size = 32, timesteps = 90)
 cass = CassianModel( dataset)
 cass.plot_model()
 
-dataset_dict = dataset.as_dictionary()
+#dataset_dict = dataset.as_dictionary()
+#cass_dict = cass.as_dictionary()
 batch = dataset.sample_batch()
+
+cass.train_on_dataset(1)
