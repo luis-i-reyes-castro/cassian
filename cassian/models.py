@@ -122,14 +122,3 @@ class CassianModel :
 
         return plot_model( model = self.model,
                            show_shapes = True, to_file = filename)
-
-## =====================================================================================
-#class CassianSimulator ( CassianModel ) :
-#
-#    def __init__( self, batch_size,
-#                  vector_input_dim, timeseries_input_dim,
-#                  vector_embedding_dim, layer_sizes ) :
-#
-#        super( CassianSimulator, self).__init__( batch_size, vec)
-#
-#        return
