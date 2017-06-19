@@ -56,9 +56,6 @@ class Dataset :
     ts_mean  = np.array([])
     ts_std   = np.array([])
 
-    batch_specs = None
-    batch_sample = None
-
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     def __init__( self, store_id = 101) :
 
@@ -234,45 +231,6 @@ class Dataset :
             dataset_objects.append( ds_obj)
 
         return ( dataset_objects[0], dataset_objects[1])
-
-    # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-    def setup_sampler( self, batch_size, timesteps) :
-
-        self.batch_specs            = BatchSpecifications()
-        self.batch_specs.batch_size = batch_size
-        self.batch_specs.timesteps  = timesteps
-        self.batch_specs.vec_dim    = self.vec_dim
-        self.batch_specs.ts_dim     = self.ts_dim
-
-        self.batch_specs.ts_replenished_dim = self.ts_replenished_dim
-        self.batch_specs.ts_returned_dim    = self.ts_returned_dim
-        self.batch_specs.ts_trashed_dim     = self.ts_trashed_dim
-        self.batch_specs.ts_found_dim       = self.ts_found_dim
-        self.batch_specs.ts_missing_dim     = self.ts_missing_dim
-
-        self.batch_sample = BatchSample( self.batch_specs)
-
-        return
-
-    # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-    def sample_batch( self) :
-
-        while True :
-
-            batch_skus = np.random.choice( a = self.list_of_skus,
-                                           p = self.list_of_sku_probs,
-                                           size = self.batch_specs.batch_size)
-
-            for sku in batch_skus :
-
-                ( inputs, targets) = \
-                self.data[sku].sample( self.batch_specs.timesteps)
-
-                self.batch_sample.include_sample( inputs, targets)
-
-            yield ( self.batch_sample.inputs, self.batch_sample.targets)
-
-        return
 
 # =====================================================================================
 class TimeseriesCategorizer :
@@ -523,10 +481,10 @@ class BatchSample :
         self.Z_found        = empty_output_tensor.copy()
         self.Z_missing      = empty_output_tensor.copy()
 
-        self.inputs  = ( self.X_vec, self.X_ts )
-        self.targets = ( self.Y_sold, self.Y_is_on_sale,
+        self.inputs  = [ self.X_vec, self.X_ts ]
+        self.targets = [ self.Y_sold, self.Y_is_on_sale,
                          self.Z_replenished, self.Z_returned, self.Z_trashed,
-                         self.Z_found, self.Z_missing )
+                         self.Z_found, self.Z_missing ]
 
         return
 

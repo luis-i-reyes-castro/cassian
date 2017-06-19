@@ -8,14 +8,16 @@ from keras.layers import Input, Dense
 from keras.layers.recurrent import SimpleRNN
 from keras.models import Model
 from keras.utils.vis_utils import plot_model
+from .data_management import BatchSpecifications, BatchSample
 from .layers import VectorDependentGatedRNN
 
 # =====================================================================================
 class CassianModel :
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-    def __init__( self, dataset, vector_embedding_dim = 16,
-                                 layer_sizes = [ 256, 256, 256] ) :
+    def __init__( self, dataset, batch_size = 32, timesteps = 90,
+                        vector_embedding_dim = 16,
+                        layer_sizes = [ 256, 256, 256] ) :
 
         def exponential( tensor) :
             return K.exp(tensor)
@@ -23,10 +25,11 @@ class CassianModel :
         def zero_one_softsign( tensor) :
             return 0.5 + 0.5 * K.softsign( 2.0 * tensor )
 
-        self.dataset          = dataset
-        self.specs            = dataset.batch_specs
+        self.dataset    = dataset
+        self.batch_size = batch_size
+        self.timesteps  = timesteps
 
-        if self.specs is None :
+        if self.dataset is None :
             raise ValueError( 'Dataset sampler method has not been setup' )
 
         self.embed_dim        = vector_embedding_dim
@@ -34,14 +37,14 @@ class CassianModel :
         self.learnable_layers = []
         self.outputs_list     = []
         self.loss_functions   = {}
-        self.steps_per_epoch  = dataset.num_timesteps \
-                              % ( self.specs.batch_size * self.specs.timesteps )
+        self.steps_per_epoch  = dataset.num_timesteps % ( batch_size * timesteps )
 
         # -----------------------------------------------------------------------------
         # Builds the input layers and the dimensionality reduction layer
 
-        self.X_vecs_shape = ( self.specs.batch_size, self.specs.vec_dim)
-        self.X_ts_shape   = ( self.specs.batch_size, None, self.specs.ts_dim)
+        self.X_vecs_shape = ( batch_size, self.dataset.vec_dim)
+        self.X_ts_shape   = ( batch_size, None, self.dataset.ts_dim)
+
         self.X_vecs       = Input( batch_shape = self.X_vecs_shape,
                                    name = 'Product_Vectors')
         self.X_ts         = Input( batch_shape = self.X_ts_shape,
@@ -108,11 +111,11 @@ class CassianModel :
         # sparse categorical cross-entropy
 
         layer_names = [ 'Replenished', 'Returned', 'Trashed', 'Found', 'Missing' ]
-        layer_dims  = [ self.specs.ts_replenished_dim,
-                        self.specs.ts_returned_dim,
-                        self.specs.ts_trashed_dim,
-                        self.specs.ts_found_dim,
-                        self.specs.ts_missing_dim ]
+        layer_dims  = [ self.dataset.ts_replenished_dim,
+                        self.dataset.ts_returned_dim,
+                        self.dataset.ts_trashed_dim,
+                        self.dataset.ts_found_dim,
+                        self.dataset.ts_missing_dim ]
         layer_losses = 'sparse_categorical_crossentropy'
 
         for ( layer_name, layer_dim) in zip( layer_names, layer_dims) :
@@ -158,9 +161,44 @@ class CassianModel :
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     def train_on_dataset( self, epochs = 1) :
 
-        self.model.fit_generator( generator = self.dataset.sample_batch,
+        self.model.fit_generator( generator = batch_generator(self),
                                   steps_per_epoch = self.steps_per_epoch,
                                   epochs = epochs,
-                                  verbose = 2)
+                                  workers = 6, pickle_safe = True)
 
         return
+
+# =====================================================================================
+def batch_generator( cassian_model) :
+
+    batch_specs            = BatchSpecifications()
+    batch_specs.batch_size = cassian_model.batch_size
+    batch_specs.timesteps  = cassian_model.timesteps
+    batch_specs.vec_dim    = cassian_model.dataset.vec_dim
+    batch_specs.ts_dim     = cassian_model.dataset.ts_dim
+
+    batch_specs.ts_replenished_dim = cassian_model.dataset.ts_replenished_dim
+    batch_specs.ts_returned_dim    = cassian_model.dataset.ts_returned_dim
+    batch_specs.ts_trashed_dim     = cassian_model.dataset.ts_trashed_dim
+    batch_specs.ts_found_dim       = cassian_model.dataset.ts_found_dim
+    batch_specs.ts_missing_dim     = cassian_model.dataset.ts_missing_dim
+
+    batch_sample = BatchSample( batch_specs)
+
+    while True :
+
+            batch_skus = \
+            np.random.choice( a = cassian_model.dataset.list_of_skus,
+                              p = cassian_model.dataset.list_of_sku_probs,
+                              size = cassian_model.batch_size )
+
+            for sku in batch_skus :
+
+                ( inputs, targets) = \
+                cassian_model.dataset.data[sku].sample( cassian_model.timesteps)
+
+                batch_sample.include_sample( inputs, targets)
+
+            yield [ batch_sample.inputs, batch_sample.targets ]
+
+    return
