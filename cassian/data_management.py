@@ -93,8 +93,9 @@ class Dataset :
         for sku in self.list_of_skus :
             vec_ = self.vectors.loc[sku]
             ts_  = data_raw['timeseries'][ sku]
-            self.data[sku] = SkuData( vector = vec_, timeseries = ts_)
-            self.data[sku].categorize_ts( self.categorizer)
+            self.data[sku] = SkuData( vector = vec_,
+                                      timeseries = ts_,
+                                      categorizers = self.categorizer)
 
         self.update_num_timesteps_and_list_of_sku_probs()
 
@@ -262,11 +263,6 @@ class TimeseriesCategorizer :
         return
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-    def get_copy( self) :
-
-        return cp.deepcopy(self)
-
-    # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     def categorize( self, input_ts) :
 
         categorical_ts = pd.cut( pd.Series( input_ts[:,0] ), bins = self.bins)
@@ -278,6 +274,11 @@ class TimeseriesCategorizer :
     def get_category_at_index( self, index) :
 
         return self.categories[index]
+
+    # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+    def get_copy( self) :
+
+        return cp.deepcopy(self)
 
 # =====================================================================================
 class SkuData :
@@ -312,7 +313,7 @@ class SkuData :
     ts_missing_dim     = 0
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-    def __init__( self, vector, timeseries) :
+    def __init__( self, vector, timeseries, categorizers) :
 
         self.vector = vector
         self.vec = self.vector.as_matrix().astype('float32')
@@ -320,12 +321,6 @@ class SkuData :
 
         self.timeseries = timeseries
         self.num_timesteps = len( self.timeseries ) - 1
-        self.setup_ts()
-
-        return
-
-    # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-    def setup_ts( self) :
 
         ts_cols = self.timeseries.columns.tolist()
         ts_cols.remove( 'UNIT_PRICE' )
@@ -349,11 +344,6 @@ class SkuData :
         self.ts_found       = self.timeseries[ ['FOUND'] ].as_matrix()
         self.ts_missing     = self.timeseries[ ['MISSING'] ].as_matrix()
 
-        return
-
-    # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-    def categorize_ts( self, categorizers) :
-
         self.ts_replenished_cat = \
         categorizers['replenished'].categorize( self.ts_replenished )
         self.ts_replenished_dim = categorizers['replenished'].num_categories
@@ -375,11 +365,6 @@ class SkuData :
         self.ts_missing_dim = categorizers['missing'].num_categories
 
         return
-
-    # =---=---=---=---=---=---=---=---=---=---=---=---=---=---=---=---=---=---=---=---=
-    def get_copy( self) :
-
-        return cp.deepcopy(self)
 
     # =---=---=---=---=---=---=---=---=---=---=---=---=---=---=---=---=---=---=---=---=
     def get_ts_mean( self) :
@@ -405,7 +390,12 @@ class SkuData :
         return
 
     # =---=---=---=---=---=---=---=---=---=---=---=---=---=---=---=---=---=---=---=---=
-    def sample( self, timesteps) :
+    def get_copy( self) :
+
+        return cp.deepcopy(self)
+
+    # =---=---=---=---=---=---=---=---=---=---=---=---=---=---=---=---=---=---=---=---=
+    def get_sample( self, timesteps) :
 
         i_start = np.random.randint( self.num_timesteps - timesteps )
         i_end   = i_start + timesteps

@@ -17,7 +17,7 @@ class CassianModel :
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     def __init__( self, dataset, batch_size = 32, timesteps = 90,
                         vector_embedding_dim = 16,
-                        layer_sizes = [ 256, 256, 256] ) :
+                        layer_sizes = [ 128, 128, 128] ) :
 
         def exponential( tensor) :
             return K.exp(tensor)
@@ -159,44 +159,48 @@ class CassianModel :
                            show_shapes = True, to_file = filename)
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-    def train_on_dataset( self, epochs = 1) :
+    def train_on_dataset( self, epochs = 1, workers = 4) :
 
-        self.model.fit_generator( generator = batch_generator(self),
+        self.model.fit_generator( generator = CassianBatchGenerator(self),
                                   steps_per_epoch = self.steps_per_epoch,
                                   epochs = epochs,
-                                  workers = 6, pickle_safe = True)
+                                  workers = workers, pickle_safe = True)
+
+        return
+
+    # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+    def compute_predictions( self) :
 
         return
 
 # =====================================================================================
-def batch_generator( cassian_model) :
+def CassianBatchGenerator( cassian_model) :
+
+    dataset = cassian_model.dataset
 
     batch_specs            = BatchSpecifications()
     batch_specs.batch_size = cassian_model.batch_size
     batch_specs.timesteps  = cassian_model.timesteps
-    batch_specs.vec_dim    = cassian_model.dataset.vec_dim
-    batch_specs.ts_dim     = cassian_model.dataset.ts_dim
+    batch_specs.vec_dim    = dataset.vec_dim
+    batch_specs.ts_dim     = dataset.ts_dim
 
-    batch_specs.ts_replenished_dim = cassian_model.dataset.ts_replenished_dim
-    batch_specs.ts_returned_dim    = cassian_model.dataset.ts_returned_dim
-    batch_specs.ts_trashed_dim     = cassian_model.dataset.ts_trashed_dim
-    batch_specs.ts_found_dim       = cassian_model.dataset.ts_found_dim
-    batch_specs.ts_missing_dim     = cassian_model.dataset.ts_missing_dim
+    batch_specs.ts_replenished_dim = dataset.ts_replenished_dim
+    batch_specs.ts_returned_dim    = dataset.ts_returned_dim
+    batch_specs.ts_trashed_dim     = dataset.ts_trashed_dim
+    batch_specs.ts_found_dim       = dataset.ts_found_dim
+    batch_specs.ts_missing_dim     = dataset.ts_missing_dim
 
     batch_sample = BatchSample( batch_specs)
 
     while True :
 
-            batch_skus = \
-            np.random.choice( a = cassian_model.dataset.list_of_skus,
-                              p = cassian_model.dataset.list_of_sku_probs,
-                              size = cassian_model.batch_size )
+            batch_skus = np.random.choice( a = dataset.list_of_skus,
+                                           p = dataset.list_of_sku_probs,
+                                           size = cassian_model.batch_size )
 
             for sku in batch_skus :
-
                 ( inputs, targets) = \
-                cassian_model.dataset.data[sku].sample( cassian_model.timesteps)
-
+                dataset.data[sku].get_sample( cassian_model.timesteps)
                 batch_sample.include_sample( inputs, targets)
 
             yield [ batch_sample.inputs, batch_sample.targets ]
