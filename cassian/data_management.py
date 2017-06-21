@@ -415,6 +415,11 @@ class SkuData :
 
         return ( inputs, targets)
 
+    # =---=---=---=---=---=---=---=---=---=---=---=---=---=---=---=---=---=---=---=---=
+    def get_most_recent_inputs( self, timesteps) :
+
+        return ( self.vec, self.ts[ -timesteps :, :] )
+
 # =====================================================================================
 class BatchSpecifications :
 

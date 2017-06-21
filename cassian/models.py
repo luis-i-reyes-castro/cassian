@@ -171,7 +171,11 @@ class CassianModel :
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     def compute_predictions( self) :
 
-        return
+        sold = np.zeros( shape = ( self.batch_size, self.timesteps) )
+
+
+
+        return sold
 
 # =====================================================================================
 def CassianBatchGenerator( cassian_model) :
