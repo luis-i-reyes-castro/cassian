@@ -6,6 +6,7 @@
 import numpy as np
 import pandas as pd
 import pyodbc
+from datetime import datetime as dt
 from .convenience import ensure_directory
 from .convenience import serialize
 
@@ -216,6 +217,128 @@ class DatabaseClient :
         return df
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+    def process_sku_timeseries( self, original_df) :
+
+        df  = pd.DataFrame( original_df )
+        sku = df['SKU_A'].iloc[0]
+
+        df.drop( [ 'SKU_A', 'SKU_B'], axis = 1, inplace = True)
+
+        df.set_index( keys = 'DATE_INDEX', inplace = True)
+
+        today = dt.today()
+        today = str(today.year) + '-' + str(today.month) + '-' + str(today.day)
+
+        if today not in df.index :
+            pass
+
+        df['DATE_INDEX'] = pd.to_datetime( df['DATE_INDEX'] )
+        df.sort_index( inplace = True)
+
+        df['ENTRIES'] -= df['TRASHED']
+
+        rows__ = df['SOLD'] < 0
+        df.loc[ rows__, 'TRASHED'] += df.loc[ rows__, 'SOLD']
+        df.loc[ rows__, 'SOLD'] = 0
+
+        col_loc = df.columns.tolist().index( 'REPLENISHED' )
+        df.insert( loc = col_loc + 1, column = 'RETURNED', value = 0)
+
+        rows__ = df['REPLENISHED'] < 0
+        df.loc[ rows__, 'RETURNED'] -= df.loc[ rows__, 'REPLENISHED']
+        df.loc[ rows__, 'REPLENISHED'] = 0
+
+        rows__ = df['ENTRIES'] > 0
+        df.loc[ rows__, 'REPLENISHED'] += df.loc[ rows__, 'ENTRIES']
+
+        rows__ = df['ENTRIES'] < 0
+        df.loc[ rows__, 'RETURNED'] -= df.loc[ rows__, 'ENTRIES']
+
+        df.drop( 'ENTRIES', axis = 1, inplace = True)
+
+        rows__ = df['TRASHED'] < 0
+        df.loc[ rows__, 'TRASHED'] *= -1
+
+        col_loc = df.columns.tolist().index( 'ADJUSTMENTS' )
+        df.insert( loc = col_loc + 1, column = 'FOUND', value = 0)
+        df.insert( loc = col_loc + 2, column = 'MISSING', value = 0)
+
+        rows__ = df['ADJUSTMENTS'] > 0
+        df.loc[ rows__, 'FOUND'] += df.loc[ rows__, 'ADJUSTMENTS']
+
+        rows__ = df['ADJUSTMENTS'] < 0
+        df.loc[ rows__, 'MISSING'] -= df.loc[ rows__, 'ADJUSTMENTS']
+
+        df.drop( 'ADJUSTMENTS', axis = 1, inplace = True)
+
+        lhs = df['STOCK_FINAL']
+        rhs = df['STOCK_INITIAL'] \
+            - df['SOLD'] \
+            + df['REPLENISHED'] \
+            - df['RETURNED'] \
+            - df['TRASHED'] \
+            + df['FOUND'] \
+            - df['MISSING']
+
+        difference = lhs - rhs
+
+        if pd.Series.any( difference != 0 ) :
+
+            rows__ = difference == 2 * ( df['FOUND'] + df['MISSING'] )
+            tmp1 = df.loc[ rows__, 'FOUND']
+            tmp2 = df.loc[ rows__, 'MISSING']
+            df.loc[ rows__, 'FOUND'] = tmp2
+            df.loc[ rows__, 'MISSING'] = tmp1
+            difference.loc[ rows__] = 0
+
+            if pd.Series.any( difference != 0 ) :
+                msg = 'Notice: Inconsistencies in timeseries for SKU '
+                print( msg + str(sku) )
+
+        df = df.asfreq('D')
+
+        columns = [ 'STOCK_INITIAL' ]
+        df[ columns] = df[ columns].fillna( method = 'bfill')
+
+        columns = [ 'SOLD', 'REPLENISHED', 'RETURNED',
+                    'TRASHED', 'MISSING', 'FOUND' ]
+        df[ columns] = df[ columns].fillna( value = 0)
+
+        columns = [ 'STOCK_FINAL', 'STOCK_LIMIT', 'IS_ON_SALE',
+                    'UNIT_PRICE', 'UNIT_UTILITY', 'UNIT_COST' ]
+        df[ columns] = df[ columns].fillna( method = 'ffill')
+
+        columns = [ 'STOCK_INITIAL', 'STOCK_FINAL' ]
+        df[ columns].astype( np.dtype('int32'), copy = False)
+
+        columns = [ 'SOLD', 'REPLENISHED', 'RETURNED',
+                    'TRASHED', 'MISSING', 'FOUND', 'STOCK_LIMIT', 'IS_ON_SALE' ]
+        df[ columns].astype( np.dtype('uint32'), copy = False)
+
+        columns = [ 'UNIT_PRICE', 'UNIT_UTILITY', 'UNIT_COST' ]
+        df[ columns].astype( np.dtype('float32'), copy = False)
+
+        columns = [ 'REPLENISHED', 'RETURNED', 'TRASHED', 'MISSING', 'FOUND' ]
+        for col_name in columns :
+            new_col_name = col_name + '_FLAG'
+            df[ new_col_name] = 0
+            df[ new_col_name].astype( np.dtype('uint32'), copy = False)
+            df.loc[ df[col_name] != 0, new_col_name] = 1
+
+        date_cols = []
+        date_cols.append( ( 'DAY_OF_YEAR',  df.index.dayofyear, 365 ) )
+        date_cols.append( ( 'DAY_OF_MONTH', df.index.day,       31  ) )
+        date_cols.append( ( 'DAY_OF_WEEK',  df.index.dayofweek, 7   ) )
+
+        for ( col, ts, limit) in date_cols :
+            df[ col + '_x' ] = np.cos( 2.0 * np.pi * ts / float(limit) )
+            df[ col + '_y' ] = np.sin( 2.0 * np.pi * ts / float(limit) )
+            df[ col + '_x' ].astype( np.dtype('float32'), copy = False)
+            df[ col + '_y' ].astype( np.dtype('float32'), copy = False)
+
+        return df
+
+    # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     def process_sku_information( self) :
 
         df = self.sku_information
@@ -333,118 +456,3 @@ class DatabaseClient :
         df_output = df_output.rename( columns = { col_for_counting : 'NUM_SKU' } )
 
         return df_output[ cols_groupby + [ 'NUM_SKU' ] ]
-
-    # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-    def process_sku_timeseries( self, original_df) :
-
-        df  = pd.DataFrame( original_df )
-        sku = df['SKU_A'].iloc[0]
-
-        df.drop( [ 'SKU_A', 'SKU_B'], axis = 1, inplace = True)
-
-        df['DATE_INDEX'] = pd.to_datetime( df['DATE_INDEX'] )
-        df.set_index( keys = 'DATE_INDEX', inplace = True)
-        df.sort_index( inplace = True)
-
-        df['ENTRIES'] -= df['TRASHED']
-
-        rows__ = df['SOLD'] < 0
-        df.loc[ rows__, 'TRASHED'] += df.loc[ rows__, 'SOLD']
-        df.loc[ rows__, 'SOLD'] = 0
-
-        col_loc = df.columns.tolist().index( 'REPLENISHED' )
-        df.insert( loc = col_loc + 1, column = 'RETURNED', value = 0)
-
-        rows__ = df['REPLENISHED'] < 0
-        df.loc[ rows__, 'RETURNED'] -= df.loc[ rows__, 'REPLENISHED']
-        df.loc[ rows__, 'REPLENISHED'] = 0
-
-        rows__ = df['ENTRIES'] > 0
-        df.loc[ rows__, 'REPLENISHED'] += df.loc[ rows__, 'ENTRIES']
-
-        rows__ = df['ENTRIES'] < 0
-        df.loc[ rows__, 'RETURNED'] -= df.loc[ rows__, 'ENTRIES']
-
-        df.drop( 'ENTRIES', axis = 1, inplace = True)
-
-        rows__ = df['TRASHED'] < 0
-        df.loc[ rows__, 'TRASHED'] *= -1
-
-        col_loc = df.columns.tolist().index( 'ADJUSTMENTS' )
-        df.insert( loc = col_loc + 1, column = 'FOUND', value = 0)
-        df.insert( loc = col_loc + 2, column = 'MISSING', value = 0)
-
-        rows__ = df['ADJUSTMENTS'] > 0
-        df.loc[ rows__, 'FOUND'] += df.loc[ rows__, 'ADJUSTMENTS']
-
-        rows__ = df['ADJUSTMENTS'] < 0
-        df.loc[ rows__, 'MISSING'] -= df.loc[ rows__, 'ADJUSTMENTS']
-
-        df.drop( 'ADJUSTMENTS', axis = 1, inplace = True)
-
-        lhs = df['STOCK_FINAL']
-        rhs = df['STOCK_INITIAL'] \
-            - df['SOLD'] \
-            + df['REPLENISHED'] \
-            - df['RETURNED'] \
-            - df['TRASHED'] \
-            + df['FOUND'] \
-            - df['MISSING']
-
-        difference = lhs - rhs
-
-        if pd.Series.any( difference != 0 ) :
-
-            rows__ = difference == 2 * ( df['FOUND'] + df['MISSING'] )
-            tmp1 = df.loc[ rows__, 'FOUND']
-            tmp2 = df.loc[ rows__, 'MISSING']
-            df.loc[ rows__, 'FOUND'] = tmp2
-            df.loc[ rows__, 'MISSING'] = tmp1
-            difference.loc[ rows__] = 0
-
-            if pd.Series.any( difference != 0 ) :
-                msg = 'Notice: Inconsistencies in timeseries for SKU '
-                print( msg + str(sku) )
-
-        df = df.asfreq('D')
-
-        columns = [ 'STOCK_INITIAL' ]
-        df[ columns] = df[ columns].fillna( method = 'bfill')
-
-        columns = [ 'SOLD', 'REPLENISHED', 'RETURNED',
-                    'TRASHED', 'MISSING', 'FOUND' ]
-        df[ columns] = df[ columns].fillna( value = 0)
-
-        columns = [ 'STOCK_FINAL', 'STOCK_LIMIT', 'IS_ON_SALE',
-                    'UNIT_PRICE', 'UNIT_UTILITY', 'UNIT_COST' ]
-        df[ columns] = df[ columns].fillna( method = 'ffill')
-
-        columns = [ 'STOCK_INITIAL', 'STOCK_FINAL' ]
-        df[ columns].astype( np.dtype('int32'), copy = False)
-
-        columns = [ 'SOLD', 'REPLENISHED', 'RETURNED',
-                    'TRASHED', 'MISSING', 'FOUND', 'STOCK_LIMIT', 'IS_ON_SALE' ]
-        df[ columns].astype( np.dtype('uint32'), copy = False)
-
-        columns = [ 'UNIT_PRICE', 'UNIT_UTILITY', 'UNIT_COST' ]
-        df[ columns].astype( np.dtype('float32'), copy = False)
-
-        columns = [ 'REPLENISHED', 'RETURNED', 'TRASHED', 'MISSING', 'FOUND' ]
-        for col_name in columns :
-            new_col_name = col_name + '_FLAG'
-            df[ new_col_name] = 0
-            df[ new_col_name].astype( np.dtype('uint32'), copy = False)
-            df.loc[ df[col_name] != 0, new_col_name] = 1
-
-        date_cols = []
-        date_cols.append( ( 'DAY_OF_YEAR',  df.index.dayofyear, 365 ) )
-        date_cols.append( ( 'DAY_OF_MONTH', df.index.day,       31  ) )
-        date_cols.append( ( 'DAY_OF_WEEK',  df.index.dayofweek, 7   ) )
-
-        for ( col, ts, limit) in date_cols :
-            df[ col + '_x' ] = np.cos( 2.0 * np.pi * ts / float(limit) )
-            df[ col + '_y' ] = np.sin( 2.0 * np.pi * ts / float(limit) )
-            df[ col + '_x' ].astype( np.dtype('float32'), copy = False)
-            df[ col + '_y' ].astype( np.dtype('float32'), copy = False)
-
-        return df
