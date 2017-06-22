@@ -7,8 +7,8 @@ import numpy as np
 import pandas as pd
 import pyodbc
 from datetime import datetime as dt
-from .convenience import ensure_directory
-from .convenience import serialize
+from .convenience import exists_file, ensure_directory
+from .convenience import de_serialize, serialize
 
 # =====================================================================================
 SCRIPT         = 'cassian/sql_scripts/tia-netezza_phase-[PHASE].sql'
@@ -101,11 +101,18 @@ class DatabaseClient :
         return self.execute_query( query)
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-    def fetch_data( self, intro_year_limit, min_num_of_records) :
+    def fetch_data( self, intro_year_limit,
+                          min_num_of_records, force_download = False) :
 
-        def print_phase_message( phase) :
-            print( 'Fetching data for Store ID ' + str( self.store_id) + \
-                   ' - Phase ' + str(phase) )
+        self.output_dir = DIR_RESULT_SET.replace( '[STORE-ID]', str( self.store_id))
+        ensure_directory( self.output_dir)
+
+        self.intro_year_limit = intro_year_limit
+        self.dic_replacements = {}
+        self.dic_replacements[ '[STORE-ID]' ] = str( self.store_id)
+        self.dic_replacements[ '[INTRO-YEAR-LIMIT]' ] = str( self.intro_year_limit)
+
+        df = self.execute_download_phase( 1, force_download)
 
         def assert_active_sku( group_of_rows) :
 
@@ -129,27 +136,13 @@ class DatabaseClient :
 
             return False
 
-        script = SCRIPT.replace( '[PHASE]', '1')
-        query = self.read_sql_script( script)
-
-        dic_replacements = {}
-        dic_replacements[ '[STORE-ID]' ] = str( self.store_id)
-        dic_replacements[ '[INTRO-YEAR-LIMIT]' ] = str( intro_year_limit)
-
-        print_phase_message(1)
-        df = self.execute_query( query, dic_replacements)
         df = df.groupby( [ 'SKU_A', 'SKU_B'] ).filter( assert_active_sku)
         df = df[ [ 'SKU_A', 'SKU_B'] ].drop_duplicates()
 
         preselected_skus = df['SKU_A'].tolist()
+        self.dic_replacements[ '[PRESELECTED_SKUS]' ] = str( tuple(preselected_skus) )
 
-        script = SCRIPT.replace( '[PHASE]', '2')
-        query = self.read_sql_script( script)
-
-        dic_replacements[ '[PRESELECTED_SKUS]' ] = str( tuple(preselected_skus))
-
-        print_phase_message(2)
-        df = self.execute_query( query, dic_replacements)
+        df = self.execute_download_phase( 2, force_download)
 
         self.sku_timeseries = {}
         for sku in preselected_skus :
@@ -157,16 +150,11 @@ class DatabaseClient :
             if len( sku_df ) >= min_num_of_records + 1 :
                 self.sku_timeseries[ sku] = self.process_sku_timeseries( sku_df)
 
-        script = SCRIPT.replace( '[PHASE]', '3')
-        query = self.read_sql_script( script)
-
         selected_skus = self.sku_timeseries.keys()
-        dic_replacements[ '[SELECTED_SKUS]' ] = str( tuple(selected_skus))
+        self.dic_replacements[ '[SELECTED_SKUS]' ] = str( tuple(selected_skus) )
 
-        print_phase_message(3)
-        self.sku_information = self.execute_query( query, dic_replacements)
-
-        self.process_sku_information()
+        df = self.execute_download_phase( 3, force_download)
+        self.process_sku_information(df)
 
         data_object = {}
         data_object['timeseries']       = self.sku_timeseries
@@ -175,14 +163,36 @@ class DatabaseClient :
         data_object['info-replenish']   = self.sku_info_replenish
         data_object['info-other']       = self.sku_info_other
 
-        output_dir = DIR_RESULT_SET.replace( '[STORE-ID]', str( self.store_id))
-        ensure_directory( output_dir)
-
-        output_file = output_dir + RESULT_SET
-        print( 'Saving data to file:', output_file)
-        serialize( data_object, output_file)
+        self.output_file = self.output_dir + 'raw.pkl'
+        print( 'Saving data to file:', self.output_file)
+        serialize( data_object, self.output_file)
 
         return
+
+    # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+    def execute_download_phase( self, phase, force_download = False) :
+
+        script = SCRIPT.replace( '[PHASE]', str(phase))
+        query = self.read_sql_script( script)
+
+        if phase == 1 :
+            print( 'Current task: Selecting and downloading SKUs' )
+        if phase == 2 :
+            print( 'Current task: Downloading SKU timeseries' )
+        if phase == 3 :
+            print( 'Current task: Downloading SKU static information' )
+
+        df_file_path = self.output_dir + 'raw_phase-' + str(phase) + '.pkl'
+
+        if not force_download and exists_file( df_file_path) :
+            print( 'Found file:', df_file_path )
+            print( 'Loading file to avoid download...' )
+            return de_serialize( df_file_path)
+
+        df = self.execute_query( query, self.dic_replacements)
+        serialize( df, df_file_path)
+
+        return df
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     def read_sql_script( self, sql_script) :
@@ -339,10 +349,7 @@ class DatabaseClient :
         return df
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-    def process_sku_information( self) :
-
-        df = self.sku_information
-        df.set_index( 'SKU_A', inplace = True)
+    def process_sku_information( self, sku_information_df) :
 
         description_cols = [ 'SECTION_L0_NAME', 'SECTION_L1_NAME',
                              'SECTION_L2_NAME', 'DESCRIPTION' ]
@@ -354,7 +361,9 @@ class DatabaseClient :
                              'REPLENISHED_MAX', 'RETURNED_MAX',
                              'TRASHED_MAX', 'FOUND_MAX', 'MISSING_MAX' ]
 
-        selected_sections = self.select_sections()
+        df = sku_information_df
+        df.set_index( 'SKU_A', inplace = True)
+        selected_sections = self.select_sections(df)
 
         for ( i, col) in enumerate( section_cols) :
             df[col] = df[col].astype( 'category' )
@@ -417,23 +426,23 @@ class DatabaseClient :
         return
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-    def select_sections( self) :
+    def select_sections( self, sku_information_df) :
 
-        df = self.count_skus_per_section( level = 0)
+        df = self.count_skus_per_section( sku_information_df, level = 0)
         sections_l0 = df[ df['NUM_SKU'] >= 10 ]['SECTION_L0'].tolist()
 
-        df = self.count_skus_per_section( level = 1)
+        df = self.count_skus_per_section( sku_information_df, level = 1)
         sections_l1 = df[ df['NUM_SKU'] >= 10 ]['SECTION_L1'].tolist()
 
-        df = self.count_skus_per_section( level = 2)
+        df = self.count_skus_per_section( sku_information_df, level = 2)
         sections_l2 = df[ df['NUM_SKU'] >= 10 ]['SECTION_L2'].tolist()
 
         return ( sections_l0, sections_l1, sections_l2)
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-    def count_skus_per_section( self, level = 0) :
+    def count_skus_per_section( self, sku_information_df, level = 0) :
 
-        df = self.sku_information
+        df = sku_information_df
         columns = [ 'SECTION_L0','SECTION_L1', 'SECTION_L2']
         col_for_counting = 'SKU_B'
 

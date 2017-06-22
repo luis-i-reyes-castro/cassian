@@ -9,6 +9,11 @@ import pandas as pd
 import pickle
 
 # -------------------------------------------------------------------------------------
+def exists_file( filename) :
+
+    return os.path.exists( filename)
+
+# -------------------------------------------------------------------------------------
 def ensure_directory( directory) :
 
     directory += '/' if not directory[-1] == '/' else ''

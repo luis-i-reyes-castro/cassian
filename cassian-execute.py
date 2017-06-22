@@ -9,7 +9,7 @@ def show_usage() :
     print( 'python3 run-stage-01.py -f|--fetch <store_id>' )
     print( 'python3 run-stage-01.py -b|--build-dataset <store_id>' )
 
-def main(argv):
+def main( argv) :
     try :
         opts, args = getopt.getopt( argv, 'hlf:b:',
                                     [ 'help', 'list', 'fetch=', 'build-dataset='] )
