@@ -13,4 +13,7 @@ import numpy as np
 dataset = Dataset.load( store_id = 101)
 cass = CassianModel( dataset, batch_size = 16, timesteps = 90)
 
+
+outputs = cass.compute_predictions()
+
 #cass.train_on_dataset(1)

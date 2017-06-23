@@ -171,11 +171,47 @@ class CassianModel :
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     def compute_predictions( self) :
 
-        sold = np.zeros( shape = ( self.batch_size, self.timesteps) )
+        num_batches = self.dataset.num_skus // self.batch_size
+        if self.dataset.num_skus % self.batch_size > 0 :
+            num_batches += 1
 
+        X_vec = np.zeros( ( self.batch_size, self.dataset.vec_dim) )
+        X_ts  = np.zeros( ( self.batch_size, self.timesteps, self.dataset.ts_dim) )
 
+        inputs = [ [ X_vec.copy(), X_ts.copy() ] for _ in range(num_batches) ]
 
-        return sold
+        sku_location_in_batch = {}
+        curr_batch = 0
+        curr_batch_index = 0
+
+        for sku in self.dataset.data.keys() :
+
+            ( x_vec, x_ts) = \
+            self.dataset.data[sku].get_most_recent_inputs( self.timesteps)
+
+            inputs[curr_batch][0][ curr_batch_index, :] = x_vec
+            inputs[curr_batch][1][ curr_batch_index, :, :] = x_ts
+
+            sku_location_in_batch[sku] = ( curr_batch, curr_batch_index)
+
+            curr_batch_index = ( curr_batch_index + 1 ) % self.batch_size
+            curr_batch += 1 if curr_batch_index == 0 else 0
+
+        outputs = [ None for _ in range(num_batches) ]
+
+        for i in range(num_batches) :
+            outputs[i] = self.model.predict( inputs[i], batch_size = self.batch_size)
+
+        predictions_sold = { sku : None for sku in self.dataset.data.keys() }
+
+        for sku in predictions_sold.keys() :
+
+            batch       = sku_location_in_batch[sku][0]
+            batch_index = sku_location_in_batch[sku][1]
+
+            predictions_sold[sku] = outputs[batch][0][ batch_index, :, 0]
+
+        return predictions_sold
 
 # =====================================================================================
 def CassianBatchGenerator( cassian_model) :
