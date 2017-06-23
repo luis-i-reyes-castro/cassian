@@ -8,15 +8,13 @@ import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
 
-from .connectivity import DIR_RESULT_SET
-from .connectivity import RESULT_SET
 from .convenience import ensure_directory
 from .convenience import serialize, de_serialize
+from .connectivity import OUTPUT_DIR as INPUT_DIR
+from .connectivity import OUTPUT_FILE as INPUT_FILE
 
 # =====================================================================================
-INPUT_DIR = DIR_RESULT_SET
-INPUT_FILE = RESULT_SET
-OUTPUT_FILE = 'ready.pkl'
+OUTPUT_FILE = 'dataset.pkl'
 
 # =====================================================================================
 class Dataset :

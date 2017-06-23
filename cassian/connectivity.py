@@ -6,14 +6,15 @@
 import numpy as np
 import pandas as pd
 import pyodbc
-from datetime import datetime as dt
+from datetime import datetime as dtdt
 from .convenience import exists_file, ensure_directory
 from .convenience import de_serialize, serialize
+from .convenience import get_yesterdays_date
 
 # =====================================================================================
-SCRIPT         = 'cassian/sql_scripts/tia-netezza_phase-[PHASE].sql'
-DIR_RESULT_SET = '/home/luis/cassian/dataset-[STORE-ID]/'
-RESULT_SET     = 'raw.pkl'
+SQL_SCRIPT  = 'cassian/sql_scripts/tia-netezza_phase-[PHASE].sql'
+OUTPUT_DIR  = '/home/luis/cassian/dataset-[STORE-ID]/'
+OUTPUT_FILE = 'raw.pkl'
 
 # =====================================================================================
 class DatabaseClient :
@@ -102,9 +103,10 @@ class DatabaseClient :
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     def fetch_data( self, intro_year_limit,
-                          min_num_of_records, force_download = False) :
+                          min_num_of_records,
+                          reuse_downloaded_result_sets = False) :
 
-        self.output_dir = DIR_RESULT_SET.replace( '[STORE-ID]', str( self.store_id))
+        self.output_dir = OUTPUT_DIR.replace( '[STORE-ID]', str( self.store_id))
         ensure_directory( self.output_dir)
 
         self.intro_year_limit = intro_year_limit
@@ -112,7 +114,7 @@ class DatabaseClient :
         self.dic_replacements[ '[STORE-ID]' ] = str( self.store_id)
         self.dic_replacements[ '[INTRO-YEAR-LIMIT]' ] = str( self.intro_year_limit)
 
-        df = self.execute_download_phase( 1, force_download)
+        df = self.execute_download_phase( 1, reuse_downloaded_result_sets)
 
         def assert_active_sku( group_of_rows) :
 
@@ -136,13 +138,18 @@ class DatabaseClient :
 
             return False
 
+        print( 'Current task: Preselecting SKUs' )
+
         df = df.groupby( [ 'SKU_A', 'SKU_B'] ).filter( assert_active_sku)
         df = df[ [ 'SKU_A', 'SKU_B'] ].drop_duplicates()
 
         preselected_skus = df['SKU_A'].tolist()
         self.dic_replacements[ '[PRESELECTED_SKUS]' ] = str( tuple(preselected_skus) )
 
-        df = self.execute_download_phase( 2, force_download)
+        df = self.execute_download_phase( 2, reuse_downloaded_result_sets)
+
+        print( 'Current task: Selecting SKUs with sufficient timeseries data ' +
+               'and processing the timeseries' )
 
         self.sku_timeseries = {}
         for sku in preselected_skus :
@@ -153,7 +160,9 @@ class DatabaseClient :
         selected_skus = self.sku_timeseries.keys()
         self.dic_replacements[ '[SELECTED_SKUS]' ] = str( tuple(selected_skus) )
 
-        df = self.execute_download_phase( 3, force_download)
+        df = self.execute_download_phase( 3, reuse_downloaded_result_sets)
+
+        print( 'Current task: Processing SKU static information' )
         self.process_sku_information(df)
 
         data_object = {}
@@ -163,31 +172,36 @@ class DatabaseClient :
         data_object['info-replenish']   = self.sku_info_replenish
         data_object['info-other']       = self.sku_info_other
 
-        self.output_file = self.output_dir + 'raw.pkl'
+        self.output_file = self.output_dir + OUTPUT_FILE
         print( 'Saving data to file:', self.output_file)
         serialize( data_object, self.output_file)
 
         return
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-    def execute_download_phase( self, phase, force_download = False) :
+    def execute_download_phase( self, phase, reuse_downloaded_result_sets = False) :
 
-        script = SCRIPT.replace( '[PHASE]', str(phase))
+        script = SQL_SCRIPT.replace( '[PHASE]', str(phase))
         query = self.read_sql_script( script)
 
         if phase == 1 :
-            print( 'Current task: Selecting and downloading SKUs' )
+            print( 'Current task: Exploring available SKUs' )
         if phase == 2 :
-            print( 'Current task: Downloading SKU timeseries' )
+            print( 'Current task: Fetching SKU timeseries (i.e. dynamic info)' )
         if phase == 3 :
-            print( 'Current task: Downloading SKU static information' )
+            print( 'Current task: Fetching SKU static information' )
 
         df_file_path = self.output_dir + 'raw_phase-' + str(phase) + '.pkl'
 
-        if not force_download and exists_file( df_file_path) :
-            print( 'Found file:', df_file_path )
-            print( 'Loading file to avoid download...' )
-            return de_serialize( df_file_path)
+        if reuse_downloaded_result_sets :
+
+            if exists_file( df_file_path) :
+                print( 'Found file:', df_file_path )
+                print( 'Re-using file to avoid download...' )
+                return de_serialize( df_file_path)
+
+            else :
+                print( 'Did not find file:', df_file_path )
 
         df = self.execute_query( query, self.dic_replacements)
         serialize( df, df_file_path)
@@ -232,18 +246,27 @@ class DatabaseClient :
         df  = pd.DataFrame( original_df )
         sku = df['SKU_A'].iloc[0]
 
+        print( 'Processing timeseries for SKU:', str(sku))
+
         df.drop( [ 'SKU_A', 'SKU_B'], axis = 1, inplace = True)
-
         df.set_index( keys = 'DATE_INDEX', inplace = True)
-
-        today = dt.today()
-        today = str(today.year) + '-' + str(today.month) + '-' + str(today.day)
-
-        if today not in df.index :
-            pass
-
-        df['DATE_INDEX'] = pd.to_datetime( df['DATE_INDEX'] )
         df.sort_index( inplace = True)
+
+        yesterday = get_yesterdays_date()
+        if not ( df.index[-1] == yesterday ) :
+            last_entry = df.iloc[-1]
+            df.loc[ yesterday, 'STOCK_INITIAL'] = last_entry['STOCK_FINAL']
+            df.loc[ yesterday, 'SOLD']          = 0
+            df.loc[ yesterday, 'REPLENISHED']   = 0
+            df.loc[ yesterday, 'TRASHED']       = 0
+            df.loc[ yesterday, 'ENTRIES']       = 0
+            df.loc[ yesterday, 'ADJUSTMENTS']   = 0
+            df.loc[ yesterday, 'STOCK_FINAL']   = last_entry['STOCK_FINAL']
+            df.loc[ yesterday, 'STOCK_LIMIT']   = last_entry['STOCK_LIMIT']
+            df.loc[ yesterday, 'IS_ON_SALE']    = last_entry['IS_ON_SALE']
+            df.loc[ yesterday, 'UNIT_PRICE']    = last_entry['UNIT_PRICE']
+            df.loc[ yesterday, 'UNIT_UTILITY']  = last_entry['UNIT_UTILITY']
+            df.loc[ yesterday, 'UNIT_COST']     = last_entry['UNIT_COST']
 
         df['ENTRIES'] -= df['TRASHED']
 
@@ -302,8 +325,11 @@ class DatabaseClient :
             difference.loc[ rows__] = 0
 
             if pd.Series.any( difference != 0 ) :
-                msg = 'Notice: Inconsistencies in timeseries for SKU '
-                print( msg + str(sku) )
+                message = '\tWarning: Numerical inconsistencies on '
+                diff_dates = difference[ difference != 0 ].index.tolist()
+                for date in diff_dates :
+                    message += dtdt.strftime( date, '%Y-%m-%d') + ', '
+                print( message[:-2] )
 
         df = df.asfreq('D')
 

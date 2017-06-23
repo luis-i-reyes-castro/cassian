@@ -2,6 +2,8 @@
 @author: Luis I. Reyes Castro
 """
 
+import datetime as dt
+from datetime import datetime as dtdt
 import matplotlib.pyplot as plt
 import numpy as np
 import os
@@ -51,6 +53,13 @@ def de_serialize( filename) :
     handle.close()
 
     return obj
+
+# -------------------------------------------------------------------------------------
+def get_yesterdays_date() :
+
+    yesterday = dtdt.today() - dt.timedelta( days = 1)
+
+    return yesterday.date()
 
 # -------------------------------------------------------------------------------------
 def plot_timeseries( ts_1, ts_2) :
