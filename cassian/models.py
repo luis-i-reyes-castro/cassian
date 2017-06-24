@@ -1,5 +1,11 @@
 """
-@author: Luis I. Reyes Castro
+@author: Luis I. Reyes-Castro
+
+COPYRIGHT
+
+All contributions by Luis I. Reyes-Castro:
+Copyright (c) 2017, Luis Ignacio Reyes Castro.
+All rights reserved.
 """
 
 import numpy as np
@@ -20,7 +26,7 @@ class CassianModel :
                         layer_sizes = [ 128, 128, 128] ) :
 
         def exponential( tensor) :
-            return K.exp(tensor)
+            return K.softplus( tensor)
 
         def zero_one_softsign( tensor) :
             return 0.5 + 0.5 * K.softsign( 2.0 * tensor )
