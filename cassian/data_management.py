@@ -63,10 +63,9 @@ class Dataset :
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     def __init__( self, store_id = 101) :
 
-        self.store_id = store_id
+        print( 'Current task: Building dataset object' )
 
-        print( 'Fetching data for Store ID ' + str(self.store_id) + ' - Phase 4' )
-        print( 'Building dataset object and discretizing outputs... ' )
+        self.store_id = store_id
 
         filename = INPUT_DIR.replace( '[STORE-ID]', str(self.store_id))
         filename += INPUT_FILE
@@ -95,6 +94,7 @@ class Dataset :
 
         self.data = {}
         for sku in self.list_of_skus :
+            print( 'Building SkuData object for SKU:', str(sku))
             vec_ = self.vectors.loc[sku]
             ts_  = data_raw['timeseries'][ sku]
             self.data[sku] = SkuData( vector = vec_,
