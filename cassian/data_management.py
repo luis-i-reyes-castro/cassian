@@ -1,5 +1,11 @@
 """
-@author: Luis I. Reyes Castro
+@author: Luis I. Reyes-Castro
+
+COPYRIGHT
+
+All contributions by Luis I. Reyes-Castro:
+Copyright (c) 2017, Luis Ignacio Reyes Castro.
+All rights reserved.
 """
 
 # =====================================================================================
@@ -417,6 +423,11 @@ class SkuData :
     def get_most_recent_inputs( self, timesteps) :
 
         return ( self.vec, self.ts[ -timesteps :, :] )
+
+    # =---=---=---=---=---=---=---=---=---=---=---=---=---=---=---=---=---=---=---=---=
+    def get_most_recent_data( self, column, timesteps) :
+
+        return self.timeseries[column].iloc[ -timesteps : ]
 
 # =====================================================================================
 class BatchSpecifications :
