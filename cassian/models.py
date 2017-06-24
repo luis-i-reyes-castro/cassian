@@ -25,18 +25,9 @@ class CassianModel :
                         vector_embedding_dim = 16,
                         layer_sizes = [ 128, 128, 128] ) :
 
-        def exponential( tensor) :
-            return K.softplus( tensor)
-
-        def zero_one_softsign( tensor) :
-            return 0.5 + 0.5 * K.softsign( 2.0 * tensor )
-
         self.dataset    = dataset
         self.batch_size = batch_size
         self.timesteps  = timesteps
-
-        if self.dataset is None :
-            raise ValueError( 'Dataset sampler method has not been setup' )
 
         self.embed_dim        = vector_embedding_dim
         self.layer_sizes      = layer_sizes
@@ -95,7 +86,11 @@ class CassianModel :
         # The second output is binary and is trained with binary cross-entropy
 
         layer_names = [ 'Sold', 'Is_On_Sale' ]
-        layer_activations = [ exponential, zero_one_softsign ]
+
+        def zero_one_softsign( tensor) :
+            return 0.5 + 0.5 * K.softsign( 2.0 * tensor )
+
+        layer_activations = [ K.softplus, zero_one_softsign ]
         layer_losses = [ 'poisson', 'binary_crossentropy' ]
 
         for ( layer_name, layer_activation, layer_loss) in \
