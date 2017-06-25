@@ -55,11 +55,14 @@ def de_serialize( filename) :
     return obj
 
 # -------------------------------------------------------------------------------------
-def get_yesterdays_date() :
+def get_date_today() :
 
-    yesterday = dtdt.today() - dt.timedelta( days = 1)
+    return dtdt.today().date()
 
-    return yesterday.date()
+# -------------------------------------------------------------------------------------
+def move_date( date, delta_days) :
+
+    return date + dt.timedelta( days = delta_days)
 
 # -------------------------------------------------------------------------------------
 def plot_timeseries( ts_1, ts_2) :

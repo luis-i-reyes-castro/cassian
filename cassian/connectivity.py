@@ -9,7 +9,7 @@ import pyodbc
 from datetime import datetime as dtdt
 from .convenience import exists_file, ensure_directory
 from .convenience import de_serialize, serialize
-from .convenience import get_yesterdays_date
+from .convenience import get_date_today, move_date
 
 # =====================================================================================
 SQL_SCRIPT  = 'cassian/sql_scripts/tia-netezza_phase-[PHASE].sql'
@@ -252,7 +252,7 @@ class DatabaseClient :
         df.set_index( keys = 'DATE_INDEX', inplace = True)
         df.sort_index( inplace = True)
 
-        yesterday = get_yesterdays_date()
+        yesterday = move_date( date = get_date_today(), delta_days = -1)
         if not ( df.index[-1] == yesterday ) :
             last_entry = df.iloc[-1]
             df.loc[ yesterday, 'STOCK_INITIAL'] = last_entry['STOCK_FINAL']
