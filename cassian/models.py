@@ -14,11 +14,15 @@ from keras.layers import Input, Dense
 from keras.layers.recurrent import SimpleRNN
 from keras.models import Model
 from keras.utils.vis_utils import plot_model
-from .data_management import BatchSpecifications, BatchSample
+
+from .data_management import Dataset, BatchSpecifications, BatchSample
 from .layers import VectorDependentGatedRNN
+from .convenience import move_date
 
 # =====================================================================================
 class CassianModel :
+
+    dataset = Dataset()
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     def __init__( self, dataset, batch_size = 32, timesteps = 90,
@@ -179,49 +183,58 @@ class CassianModel :
         X_vec = np.zeros( ( self.batch_size, self.dataset.vec_dim) )
         X_ts  = np.zeros( ( self.batch_size, self.timesteps, self.dataset.ts_dim) )
 
-        inputs = [ [ X_vec.copy(), X_ts.copy() ] for _ in range(num_batches) ]
+        inputs  = [ [ X_vec.copy(), X_ts.copy() ] for _ in range(num_batches) ]
+        outputs = [ None for _ in range(num_batches) ]
+#        summary = self.dataset.info_description.copy()
 
-        sku_location_in_batch = {}
-        curr_batch = 0
-        curr_batch_index = 0
+        curr_batch   = 0
+        curr_sample  = 0
+        sku_location = {}
+        pred_sold    = {}
 
-        for sku in self.dataset.data.keys() :
+        for sku in self.dataset() :
 
             ( x_vec, x_ts) = \
-            self.dataset.data[sku].get_most_recent_inputs( self.timesteps)
+            self.dataset(sku).get_most_recent_inputs( self.timesteps)
 
-            inputs[curr_batch][0][ curr_batch_index, :] = x_vec
-            inputs[curr_batch][1][ curr_batch_index, :, :] = x_ts
+            inputs[curr_batch][0][ curr_sample, :] = x_vec
+            inputs[curr_batch][1][ curr_sample, :, :] = x_ts
 
-            sku_location_in_batch[sku] = ( curr_batch, curr_batch_index)
+            sku_location[sku] = ( curr_batch, curr_sample)
 
-            curr_batch_index = ( curr_batch_index + 1 ) % self.batch_size
-            curr_batch += 1 if curr_batch_index == 0 else 0
+            curr_sample = ( curr_sample + 1 ) % self.batch_size
+            curr_batch += 1 if curr_sample == 0 else 0
 
-        outputs = [ None for _ in range(num_batches) ]
+            pred_sold[sku] = self.dataset(sku).timeseries[ ['SOLD'] ]
+            pred_sold[sku] = pred_sold[sku].iloc[ -self.timesteps : ]
 
         for i in range(num_batches) :
             outputs[i] = self.model.predict( inputs[i], batch_size = self.batch_size)
 
-        predictions_sold = { sku : None for sku in self.dataset.data.keys() }
+        for sku in self.dataset() :
 
-        for sku in predictions_sold.keys() :
+            batch  = sku_location[sku][0]
+            sample = sku_location[sku][1]
 
-            batch       = sku_location_in_batch[sku][0]
-            batch_index = sku_location_in_batch[sku][1]
+            predicted_ts = outputs[batch][0][ sample, :, 0]
 
-            predictions_sold[sku] = outputs[batch][0][ batch_index, :, 0]
+            start = pred_sold[sku].index[1]
+            end   = pred_sold[sku].index[-1]
+            pred_sold[sku].loc[ start : end, 'PRED'] = predicted_ts[:-1]
 
-        return predictions_sold
+            end = move_date( date = end, delta_days = +1)
+            pred_sold[sku].loc[ end, 'PRED'] = predicted_ts[-1]
+
+        return pred_sold
 
 # =====================================================================================
-def CassianBatchGenerator( cassian_model) :
+def CassianBatchGenerator( cassian) :
 
-    dataset = cassian_model.dataset
+    dataset = cassian.dataset
 
     batch_specs            = BatchSpecifications()
-    batch_specs.batch_size = cassian_model.batch_size
-    batch_specs.timesteps  = cassian_model.timesteps
+    batch_specs.batch_size = cassian.batch_size
+    batch_specs.timesteps  = cassian.timesteps
     batch_specs.vec_dim    = dataset.vec_dim
     batch_specs.ts_dim     = dataset.ts_dim
 
@@ -237,11 +250,10 @@ def CassianBatchGenerator( cassian_model) :
 
             batch_skus = np.random.choice( a = dataset.list_of_skus,
                                            p = dataset.list_of_sku_probs,
-                                           size = cassian_model.batch_size )
+                                           size = cassian.batch_size )
 
             for sku in batch_skus :
-                ( inputs, targets) = \
-                dataset.data[sku].get_sample( cassian_model.timesteps)
+                ( inputs, targets) = dataset(sku).get_sample( cassian.timesteps)
                 batch_sample.include_sample( inputs, targets)
 
             yield [ batch_sample.inputs, batch_sample.targets ]
