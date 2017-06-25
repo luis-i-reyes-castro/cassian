@@ -176,6 +176,8 @@ class CassianModel :
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     def compute_predictions( self) :
 
+        print( 'Current task: Evaluating predictions' )
+
         num_batches = self.dataset.num_skus // self.batch_size
         if self.dataset.num_skus % self.batch_size > 0 :
             num_batches += 1
@@ -185,7 +187,8 @@ class CassianModel :
 
         inputs  = [ [ X_vec.copy(), X_ts.copy() ] for _ in range(num_batches) ]
         outputs = [ None for _ in range(num_batches) ]
-#        summary = self.dataset.info_description.copy()
+
+        summary = self.dataset.info_description.copy()
 
         curr_batch   = 0
         curr_sample  = 0
@@ -205,13 +208,17 @@ class CassianModel :
             curr_sample = ( curr_sample + 1 ) % self.batch_size
             curr_batch += 1 if curr_sample == 0 else 0
 
-            pred_sold[sku] = self.dataset(sku).timeseries[ ['SOLD'] ]
+            pred_sold[sku] = self.dataset(sku).timeseries[ [ 'STOCK_INITIAL', 'SOLD'] ]
             pred_sold[sku] = pred_sold[sku].iloc[ -self.timesteps : ]
 
         for i in range(num_batches) :
+
+            print( 'Evaluating batch', str(i+1), 'of', str(num_batches))
             outputs[i] = self.model.predict( inputs[i], batch_size = self.batch_size)
 
         for sku in self.dataset() :
+
+            print( 'Collecting predictions for SKU:', str(sku))
 
             batch  = sku_location[sku][0]
             sample = sku_location[sku][1]
@@ -220,12 +227,21 @@ class CassianModel :
 
             start = pred_sold[sku].index[1]
             end   = pred_sold[sku].index[-1]
+
             pred_sold[sku].loc[ start : end, 'PRED'] = predicted_ts[:-1]
 
+            summary.loc[ sku, 'STOCK_FINAL'] = \
+            self.dataset(sku).timeseries.loc[ end, 'STOCK_FINAL']
+
             end = move_date( date = end, delta_days = +1)
+
             pred_sold[sku].loc[ end, 'PRED'] = predicted_ts[-1]
 
-        return pred_sold
+            summary.loc[ sku, 'PRED_SOLD'] = predicted_ts[-1]
+
+        summary.sort_values( by = 'PRED_SOLD', inplace = True)
+
+        return ( summary, pred_sold)
 
 # =====================================================================================
 def CassianBatchGenerator( cassian) :
