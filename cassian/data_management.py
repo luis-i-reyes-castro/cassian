@@ -61,7 +61,10 @@ class Dataset :
     ts_std   = np.array([])
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-    def __init__( self, store_id = 101) :
+    def __init__( self, store_id = None) :
+
+        if store_id is None :
+            return
 
         print( 'Current task: Building dataset object' )
 
@@ -116,6 +119,14 @@ class Dataset :
         self.normalize_timeseries()
 
         return
+
+    # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+    def __call__( self, sku = None) :
+
+        if sku is None :
+            return self.data.keys()
+
+        return self.data[sku]
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     def as_dictionary( self) :
@@ -425,9 +436,12 @@ class SkuData :
         return ( self.vec, self.ts[ -timesteps :, :] )
 
     # =---=---=---=---=---=---=---=---=---=---=---=---=---=---=---=---=---=---=---=---=
-    def get_most_recent_data( self, column, timesteps) :
+    def get_most_recent_data( self, columns, timesteps) :
 
-        return self.timeseries[column].iloc[ -timesteps : ]
+        if isinstance( columns, str) :
+            columns = [ columns ]
+
+        return self.timeseries[columns].iloc[ -timesteps : ]
 
 # =====================================================================================
 class BatchSpecifications :
