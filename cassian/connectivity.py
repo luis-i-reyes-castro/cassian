@@ -377,19 +377,13 @@ class DatabaseClient :
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     def process_sku_information( self, sku_information_df) :
 
-        description_cols = [ 'SECTION_L0_NAME', 'SECTION_L1_NAME',
-                             'SECTION_L2_NAME', 'DESCRIPTION' ]
-        section_cols     = [ 'SECTION_L0', 'SECTION_L1', 'SECTION_L2' ]
-        binary_cols      = [ 'IS_SEASONAL', 'IS_FASHION', 'IS_PERISHABLE' ]
-        replenish_cols   = [ 'UNITS_PER_REP', 'STOCK_LIMIT',
-                             'UNIT_UTILITY', 'UNIT_COST' ]
-        other_cols       = [ 'SOLD_AVG', 'SOLD_STD', 'SOLD_MAX',
-                             'REPLENISHED_MAX', 'RETURNED_MAX',
-                             'TRASHED_MAX', 'FOUND_MAX', 'MISSING_MAX' ]
-
         df = sku_information_df
         df.set_index( 'SKU_A', inplace = True)
         selected_sections = self.select_sections(df)
+
+        # -----------------------------------------------------------------------------
+        section_cols = [ 'SECTION_L0', 'SECTION_L1', 'SECTION_L2' ]
+        binary_cols  = [ 'IS_SEASONAL', 'IS_FASHION', 'IS_PERISHABLE' ]
 
         for ( i, col) in enumerate( section_cols) :
             df[col] = df[col].astype( 'category' )
@@ -400,6 +394,10 @@ class DatabaseClient :
             df.loc[  positive_rows, col] = 1
             df.loc[ ~positive_rows, col] = 0
             df[col] = df[col].astype('category')
+
+        # -----------------------------------------------------------------------------
+        replenish_cols = [ 'UNITS_PER_REP', 'STOCK_LIMIT',
+                           'UNIT_UTILITY', 'UNIT_COST' ]
 
         rows__ = df['UNITS_PER_REP'] == 0
         df.loc[ rows__, 'UNITS_PER_REP'] = 1
@@ -425,6 +423,11 @@ class DatabaseClient :
         rows__ = df['STOCK_LIMIT'] < 4 * df['UNITS_PER_REP']
         df.loc[ rows__, 'STOCK_LIMIT'] = 4 * df.loc[ rows__, 'UNITS_PER_REP']
 
+        # -----------------------------------------------------------------------------
+        other_cols = [ 'SOLD_AVG', 'SOLD_STD', 'SOLD_MAX',
+                       'REPLENISHED_MAX', 'RETURNED_MAX',
+                       'TRASHED_MAX', 'FOUND_MAX', 'MISSING_MAX' ]
+
         for col_name in other_cols :
 
             mode_str = col_name[-3:]
@@ -444,10 +447,19 @@ class DatabaseClient :
                 df.loc[ index, col_name] = \
                 function( self.sku_timeseries[ index][ col_name[:-4] ] )
 
-        self.sku_info_description = df[ description_cols ]
-        self.sku_info_main        = df[ section_cols + binary_cols ]
-        self.sku_info_replenish   = df[ replenish_cols ]
-        self.sku_info_other       = df[ other_cols ]
+        # -----------------------------------------------------------------------------
+        self.sku_info_main      = df[ section_cols + binary_cols ]
+        self.sku_info_replenish = df[ replenish_cols ]
+        self.sku_info_other     = df[ other_cols ]
+
+        # -----------------------------------------------------------------------------
+        description_cols = [ column + '_NAME' for column in section_cols ]
+        description_cols.append( 'DESCRIPTION' )
+
+        self.sku_info_description = df[ description_cols ].copy()
+
+        replace = { description_cols[i] : section_cols[i] for i in range(3) }
+        self.sku_info_description.rename( columns = replace, inplace = True)
 
         return
 
