@@ -17,18 +17,28 @@ from keras.utils.vis_utils import plot_model
 
 from .data_management import Dataset, BatchSpecifications, BatchSample
 from .layers import VectorDependentGatedRNN
+from .convenience import ensure_directory
+from .convenience import serialize, de_serialize
 from .convenience import move_date
+
+# =====================================================================================
+from .data_management import INPUT_DIR
+from .data_management import INPUT_FILE
+OUTPUT_DIR  = '/home/luis/cassian/trained-models/'
+OUTPUT_FILE = 'store-[STORE-ID].pkl'
 
 # =====================================================================================
 class CassianModel :
 
-    dataset = Dataset()
+    store_id    = 0
+    dataset     = Dataset()
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     def __init__( self, dataset, batch_size = 32, timesteps = 90,
                         vector_embedding_dim = 32,
                         layer_sizes = [ 256, 256, 256] ) :
 
+        self.store_id   = dataset.store_id
         self.dataset    = dataset
         self.batch_size = batch_size
         self.timesteps  = timesteps
@@ -146,6 +156,29 @@ class CassianModel :
     def as_dictionary( self) :
 
         return self.__dict__
+
+    # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+    def save( self) :
+
+        self.dataset = None
+
+        ensure_directory( OUTPUT_DIR)
+
+        output_file = OUTPUT_FILE.replace( '[STORE-ID]', str(self.store_id))
+        output_file = OUTPUT_DIR + output_file
+
+        print( 'Saving data to file:', output_file)
+        serialize( self, output_file)
+
+        return
+
+    # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+    @staticmethod
+    def load( store_id) :
+
+        dataset = Dataset.load( store_id = store_id)
+
+        return dataset
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     def copy_weights( self, original_cassian) :
