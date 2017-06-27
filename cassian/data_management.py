@@ -14,18 +14,16 @@ import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
 
-from .convenience import ensure_directory
+from .convenience import exists_file, ensure_directory
 from .convenience import serialize, de_serialize
-from .connectivity import OUTPUT_DIR as INPUT_DIR
-from .connectivity import OUTPUT_FILE as INPUT_FILE
-
-# =====================================================================================
-OUTPUT_FILE = 'dataset.pkl'
 
 # =====================================================================================
 class Dataset :
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+    OUTPUT_DIR  = '/home/luis/cassian/dataset-[STORE-ID]/'
+    OUTPUT_FILE = 'ready-dataset.pkl'
+
     store_id         = 0
     info_main        = pd.DataFrame()
     info_replenish   = pd.DataFrame()
@@ -61,23 +59,21 @@ class Dataset :
     ts_std   = np.array([])
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-    def __init__( self, store_id = None) :
+    def __init__( self, raw_data_file = None) :
 
-        if store_id is None :
+        if raw_data_file is None :
             return
+        elif not exists_file( raw_data_file) :
+            raise ValueError( 'Did not find file:', str(raw_data_file))
 
         print( 'Current task: Building dataset object' )
+        raw_data = de_serialize( raw_data_file)
 
-        self.store_id = store_id
-
-        filename = INPUT_DIR.replace( '[STORE-ID]', str(self.store_id))
-        filename += INPUT_FILE
-        data_raw = de_serialize( filename)
-
-        self.info_main        = data_raw['info-main']
-        self.info_replenish   = data_raw['info-replenish']
-        self.info_other       = data_raw['info-other']
-        self.info_description = data_raw['info-description']
+        self.store_id         = raw_data['store-id']
+        self.info_main        = raw_data['info-main']
+        self.info_replenish   = raw_data['info-replenish']
+        self.info_other       = raw_data['info-other']
+        self.info_description = raw_data['info-description']
         self.num_skus         = len( self.info_main )
         self.list_of_skus     = self.info_main.index.tolist()
 
@@ -99,7 +95,7 @@ class Dataset :
         for sku in self.list_of_skus :
             print( 'Building SkuData object for SKU:', str(sku))
             vec_ = self.vectors.loc[sku]
-            ts_  = data_raw['timeseries'][ sku]
+            ts_  = raw_data['timeseries'][ sku]
             self.data[sku] = SkuData( vector = vec_,
                                       timeseries = ts_,
                                       categorizers = self.categorizer)
@@ -136,10 +132,11 @@ class Dataset :
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     def save( self) :
 
-        output_directory = INPUT_DIR.replace( '[STORE-ID]', str(self.store_id))
+        output_directory = self.OUTPUT_DIR.replace( '[STORE-ID]', str(self.store_id))
         ensure_directory( output_directory)
 
-        output_file = output_directory + OUTPUT_FILE
+        output_file = output_directory + self.OUTPUT_FILE
+
         print( 'Saving data to file:', output_file)
         serialize( self, output_file)
 
@@ -147,11 +144,12 @@ class Dataset :
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     @staticmethod
-    def load( store_id) :
+    def load( dataset_filename) :
 
-        filename = INPUT_DIR.replace( '[STORE-ID]', str(store_id))
-        filename += OUTPUT_FILE
-        return de_serialize( filename)
+        if not exists_file( dataset_filename) :
+            raise ValueError( 'Did not find file:', str(dataset_filename))
+
+        return de_serialize( dataset_filename)
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     def update_num_timesteps_and_list_of_sku_probs( self) :
