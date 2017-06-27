@@ -120,7 +120,7 @@ class Dataset :
     def __call__( self, sku = None) :
 
         if sku is None :
-            return self.data.keys()
+            return self.info_main.index.tolist()
 
         return self.data[sku]
 
