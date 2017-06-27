@@ -12,14 +12,13 @@ from .convenience import de_serialize, serialize
 from .convenience import get_date_today, move_date
 
 # =====================================================================================
-SQL_SCRIPT  = 'cassian/sql_scripts/tia-netezza_phase-[PHASE].sql'
-OUTPUT_DIR  = '/home/luis/cassian/dataset-[STORE-ID]/'
-OUTPUT_FILE = 'raw.pkl'
-
-# =====================================================================================
 class DatabaseClient :
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+    SQL_SCRIPT  = '/home/luis/cassian/cassian/sql_scripts/tia-netezza_phase-[PHASE].sql'
+    OUTPUT_DIR  = '/home/luis/cassian/dataset-[STORE-ID]/'
+    OUTPUT_FILE = 'raw-data.pkl'
+
     sku_timeseries       = None
     sku_information      = None
     sku_info_description = None
@@ -32,30 +31,6 @@ class DatabaseClient :
 
         self.data_source = data_source_name
         self.store_id    = store_id
-
-        return
-
-    # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-    def get_list_of_stores( self) :
-
-        print( 'Downloading list of stores...' )
-
-        query   = 'SELECT COD_SUCURSAL, NOM_SUCURSAL, FORMATO, TIPO, ' + \
-                  'CIUDAD, FECHA_APERTURA FROM DW_SUCURSAL_DIM' + '\n'
-        df      = self.execute_query( query)
-
-        replace = { 'COD_SUCURSAL' : 'ID',
-                    'NOM_SUCURSAL' : 'NAME',
-                    'FORMATO' : 'FORMAT',
-                    'TIPO'  : 'TYPE',
-                    'CIUDAD' : 'CITY',
-                    'FECHA_APERTURA' : 'OPENING_DATE' }
-
-        df.rename( columns = replace, inplace = True)
-        df.sort_values( by = 'ID', inplace = True)
-
-        print( 'Saving data to file list-of-stores.csv.' )
-        df.to_csv( 'list-of-stores.csv', index = False)
 
         return
 
@@ -102,11 +77,35 @@ class DatabaseClient :
         return self.execute_query( query)
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+    def get_list_of_stores( self) :
+
+        print( 'Downloading list of stores...' )
+
+        query   = 'SELECT COD_SUCURSAL, NOM_SUCURSAL, FORMATO, TIPO, ' + \
+                  'CIUDAD, FECHA_APERTURA FROM DW_SUCURSAL_DIM' + '\n'
+        df      = self.execute_query( query)
+
+        replace = { 'COD_SUCURSAL' : 'ID',
+                    'NOM_SUCURSAL' : 'NAME',
+                    'FORMATO' : 'FORMAT',
+                    'TIPO'  : 'TYPE',
+                    'CIUDAD' : 'CITY',
+                    'FECHA_APERTURA' : 'OPENING_DATE' }
+
+        df.rename( columns = replace, inplace = True)
+        df.sort_values( by = 'ID', inplace = True)
+
+        print( 'Saving data to file list-of-stores.csv.' )
+        df.to_csv( 'list-of-stores.csv', index = False)
+
+        return
+
+    # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     def fetch_data( self, intro_year_limit,
                           min_num_of_records,
                           reuse_downloaded_result_sets = False) :
 
-        self.output_dir = OUTPUT_DIR.replace( '[STORE-ID]', str( self.store_id))
+        self.output_dir = self.OUTPUT_DIR.replace( '[STORE-ID]', str( self.store_id))
         ensure_directory( self.output_dir)
 
         self.intro_year_limit = intro_year_limit
@@ -166,13 +165,14 @@ class DatabaseClient :
         self.process_sku_information(df)
 
         data_object = {}
+        data_object['store-id']         = self.store_id
         data_object['timeseries']       = self.sku_timeseries
-        data_object['info-description'] = self.sku_info_description
         data_object['info-main']        = self.sku_info_main
         data_object['info-replenish']   = self.sku_info_replenish
         data_object['info-other']       = self.sku_info_other
+        data_object['info-description'] = self.sku_info_description
 
-        self.output_file = self.output_dir + OUTPUT_FILE
+        self.output_file = self.output_dir + self.OUTPUT_FILE
         print( 'Saving data to file:', self.output_file)
         serialize( data_object, self.output_file)
 
@@ -181,7 +181,7 @@ class DatabaseClient :
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     def execute_download_phase( self, phase, reuse_downloaded_result_sets = False) :
 
-        script = SQL_SCRIPT.replace( '[PHASE]', str(phase))
+        script = self.SQL_SCRIPT.replace( '[PHASE]', str(phase))
         query = self.read_sql_script( script)
 
         if phase == 1 :
