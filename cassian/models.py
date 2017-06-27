@@ -17,38 +17,46 @@ from keras.utils.vis_utils import plot_model
 
 from .data_management import Dataset, BatchSpecifications, BatchSample
 from .layers import VectorDependentGatedRNN
-from .convenience import ensure_directory
+from .convenience import exists_file, ensure_directory
 from .convenience import serialize, de_serialize
 from .convenience import move_date
 
 # =====================================================================================
-from .data_management import INPUT_DIR
-from .data_management import INPUT_FILE
-OUTPUT_DIR  = '/home/luis/cassian/trained-models/'
-OUTPUT_FILE = 'store-[STORE-ID].pkl'
-
-# =====================================================================================
 class CassianModel :
 
-    store_id    = 0
-    dataset     = Dataset()
+    # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+    OUTPUT_DIR   = '/home/luis/cassian/trained-models/'
+    OUTPUT_FILE  = 'store-[STORE-ID]-model.pkl'
+    WEIGHTS_FILE = 'store-[STORE-ID]-weights.h5'
+    RESULTS_DIR  = '/home/luis/cassian/results/'
+    RESULTS_FILE = 'store-[STORE-ID].pkl'
+
+    dataset_filename = None
+    dataset          = Dataset()
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-    def __init__( self, dataset, batch_size = 32, timesteps = 90,
+    def __init__( self, dataset_filename, batch_size = 32, timesteps = 90,
                         vector_embedding_dim = 32,
                         layer_sizes = [ 256, 256, 256] ) :
 
-        self.store_id   = dataset.store_id
-        self.dataset    = dataset
-        self.batch_size = batch_size
-        self.timesteps  = timesteps
+        print( 'Current task: Loading Dataset instance' )
+        if not exists_file( dataset_filename) :
+            raise ValueError( 'Did not find file:', str(dataset_filename))
 
-        self.embed_dim        = vector_embedding_dim
-        self.layer_sizes      = layer_sizes
-        self.learnable_layers = []
-        self.outputs_list     = []
-        self.loss_functions   = {}
-        self.steps_per_epoch  = dataset.num_timesteps % ( batch_size * timesteps )
+        self.dataset_filename = dataset_filename
+        self.dataset = Dataset.load( self.dataset_filename)
+
+        print( 'Current task: Building CassianModel instance' )
+        self.store_id        = self.dataset.store_id
+        self.batch_size      = batch_size
+        self.timesteps       = timesteps
+        self.steps_per_epoch = self.dataset.num_timesteps % ( batch_size * timesteps )
+
+        self.vector_embedding_dim = vector_embedding_dim
+        self.layer_sizes          = layer_sizes
+        self.learnable_layers     = []
+        self.outputs_list         = []
+        self.loss_functions       = {}
 
         # -----------------------------------------------------------------------------
         # Builds the input layers and the dimensionality reduction layer
@@ -62,7 +70,7 @@ class CassianModel :
                                    name = 'Product_TS')
 
         layer_name = 'Dim_Reduction'
-        self.embedding = Dense( units = self.embed_dim,
+        self.embedding = Dense( units = self.vector_embedding_dim,
                                 activation = 'softsign',
                                 name = layer_name )( self.X_vecs)
         self.learnable_layers.append( layer_name )
@@ -160,32 +168,57 @@ class CassianModel :
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     def save( self) :
 
-        self.dataset = None
+        ensure_directory( self.OUTPUT_DIR)
 
-        ensure_directory( OUTPUT_DIR)
+        output_file  = self.OUTPUT_DIR \
+                     + self.OUTPUT_FILE.replace( '[STORE-ID]', str(self.store_id))
+        weights_file = self.OUTPUT_DIR \
+                     + self.WEIGHTS_FILE.replace( '[STORE-ID]', str(self.store_id))
 
-        output_file = OUTPUT_FILE.replace( '[STORE-ID]', str(self.store_id))
-        output_file = OUTPUT_DIR + output_file
+        output_dict = {}
+        output_dict['dataset_filename']     = self.dataset_filename
+        output_dict['batch_size']           = self.batch_size
+        output_dict['timesteps']            = self.timesteps
+        output_dict['vector_embedding_dim'] = self.vector_embedding_dim
+        output_dict['layer_sizes']          = self.layer_sizes
+        output_dict['weights_filename']     = weights_file
 
-        print( 'Saving data to file:', output_file)
-        serialize( self, output_file)
+        print( 'Saving CassianModel instance to file:', output_file)
+        serialize( output_dict, output_file)
+
+        print( 'Saving CassianModel weights to file:', weights_file)
+        self.model.save_weights( weights_file)
 
         return
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     @staticmethod
-    def load( store_id) :
+    def load( cassian_model_file) :
 
-        dataset = Dataset.load( store_id = store_id)
+        print( 'Loading CassianModel instance from file:', cassian_model_file)
+        if not exists_file( cassian_model_file) :
+            raise ValueError( 'Did not find file:', str(cassian_model_file))
 
-        return dataset
+        input_dict = de_serialize( cassian_model_file)
+
+        cassian = CassianModel( input_dict['dataset_filename'],
+                                input_dict['batch_size'],
+                                input_dict['timesteps'],
+                                input_dict['vector_embedding_dim'],
+                                input_dict['layer_sizes'] )
+
+        cassian.model.load_weights( input_dict['weights_filename'] )
+        cassian.model.compile( optimizer = 'adam', loss = cassian.loss_functions)
+
+        return cassian
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-    def copy_weights( self, original_cassian) :
+    def copy_weights( self, original_model) :
 
         for layer in self.learnable_layers :
 
-            original_weights = original_cassian.model.get_layer(layer).get_weights()
+            original_weights = original_model.get_layer(layer).get_weights()
+
             self.model.get_layer(layer).set_weights( original_weights )
 
         return
@@ -229,6 +262,8 @@ class CassianModel :
 
             return
 
+        print( 'Current task: Training for ' + str(epochs) + ' epochs' )
+
         self.model.fit_generator( generator = batch_generator(),
                                   steps_per_epoch = self.steps_per_epoch,
                                   epochs = epochs,
@@ -252,12 +287,11 @@ class CassianModel :
         inputs  = [ [ X_vec.copy(), X_ts.copy() ] for _ in range(num_batches) ]
         outputs = [ None for _ in range(num_batches) ]
 
-        summary = self.dataset.info_description.copy()
-
         curr_batch   = 0
         curr_sample  = 0
         sku_location = {}
         pred_sold    = {}
+        summary      = self.dataset.info_description.copy()
 
         for sku in self.dataset() :
 
@@ -305,4 +339,16 @@ class CassianModel :
 
         summary.sort_values( by = 'PRED_SOLD', inplace = True)
 
-        return ( summary, pred_sold)
+        results_dict = {}
+        results_dict['pred_SOLD'] = pred_sold
+        results_dict['summary']   = summary
+
+        ensure_directory( self.RESULTS_DIR)
+
+        results_file = self.RESULTS_DIR \
+                     + self.RESULTS_FILE.replace( '[STORE-ID]', str(self.store_id))
+
+        print( 'Saving data to file:', results_file)
+        serialize( results_dict, results_file)
+
+        return summary
