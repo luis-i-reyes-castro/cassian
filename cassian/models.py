@@ -9,6 +9,7 @@ All rights reserved.
 """
 
 import numpy as np
+import pandas as pd
 from keras import backend as K
 from keras.layers import Input, Dense
 from keras.layers.recurrent import SimpleRNN
@@ -289,11 +290,14 @@ class CassianModel :
 
         curr_batch   = 0
         curr_sample  = 0
-        sku_location = {}
-        pred_sold    = {}
+        sku_at_location = np.zeros( ( num_batches, self.batch_size), dtype = int)
+
+        predictions  = { sku : None for sku in self.dataset() }
         summary      = self.dataset.info_description.copy()
 
         for sku in self.dataset() :
+
+            sku_at_location[ curr_batch, curr_sample] = sku
 
             ( x_vec, x_ts) = \
             self.dataset(sku).get_most_recent_inputs( self.timesteps)
@@ -301,46 +305,69 @@ class CassianModel :
             inputs[curr_batch][0][ curr_sample, :] = x_vec
             inputs[curr_batch][1][ curr_sample, :, :] = x_ts
 
-            sku_location[sku] = ( curr_batch, curr_sample)
-
             curr_sample = ( curr_sample + 1 ) % self.batch_size
             curr_batch += 1 if curr_sample == 0 else 0
 
-            pred_sold[sku] = self.dataset(sku).timeseries[ [ 'STOCK_INITIAL', 'SOLD'] ]
-            pred_sold[sku] = pred_sold[sku].iloc[ -self.timesteps : ]
+#            predictions[sku] = \
+#            self.dataset(sku).timeseries.iloc[ -self.timesteps :][ 'STOCK_INITIAL', 'SOLD']
 
         for i in range(num_batches) :
 
             print( 'Evaluating batch', str(i+1), 'of', str(num_batches))
             outputs[i] = self.model.predict( inputs[i], batch_size = self.batch_size)
 
-        for sku in self.dataset() :
+            for j in range(self.batch_size) :
 
-            print( 'Collecting predictions for SKU:', str(sku))
+                sku = sku_at_location[i,j]
+                if not sku :
+                    break
+                else :
+                    print( 'Collecting predictions for SKU:', str(sku))
 
-            batch  = sku_location[sku][0]
-            sample = sku_location[sku][1]
+                df_index = self.dataset(sku).timeseries.index[ -self.timesteps: ]
+                df_cols  = [ 'Initial_Stock', 'Sold', 'Expected_Sales']
 
-            predicted_ts = outputs[batch][0][ sample, :, 0]
+                predictions[sku] = pd.Dataframe( data = np.NAN,
+                                                 index = df_index, columns = df_cols)
+                predictions[sku]['Initial_Stock'] = \
+                self.dataset(sku).timeseries.iloc[ -self.timesteps:, 'STOCK_INITIAL']
 
-            start = pred_sold[sku].index[1]
-            end   = pred_sold[sku].index[-1]
+                predictions[sku]['Sold'] = \
+                self.dataset(sku).timeseries.iloc[ -self.timesteps:, 'SOLD']
 
-            pred_sold[sku].loc[ start : end, 'PRED'] = predicted_ts[:-1]
+                predicted_sold = outputs[i][0][ j, :, 0]
 
-            summary.loc[ sku, 'STOCK_FINAL'] = \
-            self.dataset(sku).timeseries.loc[ end, 'STOCK_FINAL']
+                predictions[sku].iloc[ -self.timesteps + 1 :, 'Expected_Sales'] = \
+                predicted_sold[:-1]
 
-            end = move_date( date = end, delta_days = +1)
 
-            pred_sold[sku].loc[ end, 'PRED'] = predicted_ts[-1]
-
-            summary.loc[ sku, 'PRED_SOLD'] = predicted_ts[-1]
+#        for sku in self.dataset() :
+#
+#            print( 'Collecting predictions for SKU:', str(sku))
+#
+#            batch  = sku_location[sku][0]
+#            sample = sku_location[sku][1]
+#
+#            predicted_ts = outputs[batch][0][ sample, :, 0]
+#
+#            start = predictions[sku].index[1]
+#            end   = predictions[sku].index[-1]
+#
+#            predictions[sku].loc[ start : end, 'PRED'] = predicted_ts[:-1]
+#
+#            summary.loc[ sku, 'STOCK_FINAL'] = \
+#            self.dataset(sku).timeseries.loc[ end, 'STOCK_FINAL']
+#
+#            end = move_date( date = end, delta_days = +1)
+#
+#            predictions[sku].loc[ end, 'PRED'] = predicted_ts[-1]
+#
+#            summary.loc[ sku, 'PRED_SOLD'] = predicted_ts[-1]
 
         summary.sort_values( by = 'PRED_SOLD', inplace = True)
 
         results_dict = {}
-        results_dict['pred_SOLD'] = pred_sold
+        results_dict['predictions'] = predictions
         results_dict['summary']   = summary
 
         ensure_directory( self.RESULTS_DIR)
