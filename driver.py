@@ -6,21 +6,11 @@
 #                   min_num_of_records = 180, reuse_downloaded_result_sets=True)
 
 # -------------------------------------------------------------------------------------
-from cassian.data_management import Dataset
 from cassian.models import CassianModel
-from cassian.convenience import move_date
-import numpy as np
-import pandas as pd
-import datetime as dt
-from datetime import datetime as dtdt
 
-batch_size = 24
-timesteps = 90
+dataset = 'dataset-101/ready-dataset.pkl'
+cassian = CassianModel( dataset, batch_size = 24, timesteps = 90)
 
-dataset = Dataset.load( store_id = 101)
-cass = CassianModel( dataset, batch_size, timesteps)
-
-cass.train_on_dataset(1)
-( summary, pred_dict) = cass.compute_predictions()
-
-summary
+cassian.train_on_dataset( epochs = 2, workers = 8)
+cassian.compute_predictions()
+cassian.save()

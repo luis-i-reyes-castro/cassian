@@ -11,9 +11,10 @@ def show_usage() :
 
 def main( argv) :
 
+    long_opts = [ 'help', 'list', 'fetch=', 'resume']
+
     try :
-        opts, args = getopt.getopt( argv, 'hlf:r',
-                                    [ 'help', 'list', 'fetch=', 'resume'] )
+        opts, args = getopt.getopt( argv, 'hlf:r', long_opts)
     except getopt.GetoptError :
         print( 'Failed to retrieve arguments and/or options!' )
         show_usage()
@@ -45,7 +46,7 @@ def main( argv) :
         client.fetch_data( intro_year_limit = 2015,
                            min_num_of_records = 180,
                            reuse_downloaded_result_sets = resume)
-        dataset = Dataset( store_id = store_id)
+        dataset = Dataset( raw_data_file = client.output_file)
         dataset.save()
 
     return

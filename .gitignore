@@ -1,4 +1,5 @@
 cassian/__pycache__
 dataset-*
+trained-models
 *.csv
 *.png
