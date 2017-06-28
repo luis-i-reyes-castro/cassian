@@ -257,8 +257,13 @@ class CassianModel :
                                                p = self.dataset.list_of_sku_probs,
                                                size = self.batch_size )
 
-                for sku in batch_skus :
-                    ( inputs, targets) = self.dataset(sku).get_sample( self.timesteps)
+                random_seeds = np.random.rand( self.batch_size)
+
+                for ( i, sku) in enumerate(batch_skus) :
+
+                    ( inputs, targets) = \
+                    self.dataset(sku).get_sample( self.timesteps, random_seeds[i])
+
                     batch_sample.include_sample( inputs, targets)
 
                 yield [ batch_sample.inputs, batch_sample.targets ]

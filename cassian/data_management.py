@@ -408,9 +408,9 @@ class SkuData :
         return cp.deepcopy(self)
 
     # =---=---=---=---=---=---=---=---=---=---=---=---=---=---=---=---=---=---=---=---=
-    def get_sample( self, timesteps) :
+    def get_sample( self, timesteps, seed = None) :
 
-        i_start = np.random.randint( self.num_timesteps - timesteps )
+        i_start = int( seed * ( self.num_timesteps - timesteps ) )
         i_end   = i_start + timesteps
 
         inputs = ( self.vec, self.ts[ i_start : i_end, :] )
