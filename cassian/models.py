@@ -308,9 +308,6 @@ class CassianModel :
             curr_sample = ( curr_sample + 1 ) % self.batch_size
             curr_batch += 1 if curr_sample == 0 else 0
 
-#            predictions[sku] = \
-#            self.dataset(sku).timeseries.iloc[ -self.timesteps :][ 'STOCK_INITIAL', 'SOLD']
-
         for i in range(num_batches) :
 
             print( 'Evaluating batch', str(i+1), 'of', str(num_batches))
@@ -327,48 +324,38 @@ class CassianModel :
                 df_index = self.dataset(sku).timeseries.index[ -self.timesteps: ]
                 df_cols  = [ 'Initial_Stock', 'Sold', 'Expected_Sales']
 
-                predictions[sku] = pd.Dataframe( data = np.NAN,
+                predictions[sku] = pd.DataFrame( data = np.NAN,
                                                  index = df_index, columns = df_cols)
+
                 predictions[sku]['Initial_Stock'] = \
-                self.dataset(sku).timeseries.iloc[ -self.timesteps:, 'STOCK_INITIAL']
+                self.dataset(sku).timeseries.iloc[ -self.timesteps: ]['STOCK_INITIAL']
 
                 predictions[sku]['Sold'] = \
-                self.dataset(sku).timeseries.iloc[ -self.timesteps:, 'SOLD']
+                self.dataset(sku).timeseries.iloc[ -self.timesteps: ]['SOLD']
 
                 predicted_sold = outputs[i][0][ j, :, 0]
 
-                predictions[sku].iloc[ -self.timesteps + 1 :, 'Expected_Sales'] = \
+                second_day = predictions[sku].index[1]
+                last_day   = predictions[sku].index[-1]
+
+                predictions[sku].loc[ second_day : last_day, 'Expected_Sales'] = \
                 predicted_sold[:-1]
 
+                summary.loc[ sku, 'Initial_Stock'] = \
+                self.dataset(sku).timeseries.loc[ last_day, 'STOCK_FINAL']
 
-#        for sku in self.dataset() :
-#
-#            print( 'Collecting predictions for SKU:', str(sku))
-#
-#            batch  = sku_location[sku][0]
-#            sample = sku_location[sku][1]
-#
-#            predicted_ts = outputs[batch][0][ sample, :, 0]
-#
-#            start = predictions[sku].index[1]
-#            end   = predictions[sku].index[-1]
-#
-#            predictions[sku].loc[ start : end, 'PRED'] = predicted_ts[:-1]
-#
-#            summary.loc[ sku, 'STOCK_FINAL'] = \
-#            self.dataset(sku).timeseries.loc[ end, 'STOCK_FINAL']
-#
-#            end = move_date( date = end, delta_days = +1)
-#
-#            predictions[sku].loc[ end, 'PRED'] = predicted_ts[-1]
-#
-#            summary.loc[ sku, 'PRED_SOLD'] = predicted_ts[-1]
+                last_day = move_date( date = last_day, delta_days = +1)
 
-        summary.sort_values( by = 'PRED_SOLD', inplace = True)
+                predictions[sku].loc[ last_day, 'Expected_Sales'] = \
+                predicted_sold[-1]
 
-        results_dict = {}
+                summary.loc[ sku, 'Expected_Sales'] = predicted_sold[-1]
+
+        summary.sort_values( by = 'Expected_Sales', inplace = True)
+
+        results_dict                = {}
         results_dict['predictions'] = predictions
-        results_dict['summary']   = summary
+        results_dict['summary']     = summary
 
         ensure_directory( self.RESULTS_DIR)
 
@@ -378,4 +365,4 @@ class CassianModel :
         print( 'Saving data to file:', results_file)
         serialize( results_dict, results_file)
 
-        return summary
+        return predictions, summary
