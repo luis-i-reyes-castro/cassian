@@ -12,7 +12,7 @@ import numpy as np
 import pandas as pd
 from keras import backend as K
 from keras.layers import Input, Dense
-from keras.layers.recurrent import SimpleRNN
+from keras.layers.wrappers import TimeDistributed
 from keras.models import Model
 from keras.utils.vis_utils import plot_model
 
@@ -119,11 +119,12 @@ class CassianModel :
         for ( layer_name, layer_activation, layer_loss) in \
             zip( layer_names, layer_activations, layer_losses) :
 
-            layer_object = SimpleRNN( name = layer_name,
-                                      units = 1,
-                                      activation = layer_activation,
-                                      return_sequences = True)
-            output_tensor = layer_object( self.layer_outputs[-1] )
+            dense_layer = Dense( input_dim = self.layer_sizes[-1],
+                                 units = 1,
+                                 activation = layer_activation)
+
+            output_tensor = \
+            TimeDistributed( dense_layer, name = layer_name)( self.layer_outputs[-1] )
 
             self.learnable_layers.append( layer_name)
             self.outputs_list.append( output_tensor)
@@ -144,11 +145,12 @@ class CassianModel :
 
         for ( layer_name, layer_dim) in zip( layer_names, layer_dims) :
 
-            layer_object = SimpleRNN( name = layer_name,
-                                      units = layer_dim,
-                                      activation = 'softmax',
-                                      return_sequences = True)
-            output_tensor = layer_object( self.layer_outputs[-1] )
+            dense_layer = Dense( input_dim = self.layer_sizes[-1],
+                                 units = layer_dim,
+                                 activation = 'softmax')
+
+            output_tensor = \
+            TimeDistributed( dense_layer, name = layer_name)( self.layer_outputs[-1] )
 
             self.learnable_layers.append( layer_name)
             self.outputs_list.append( output_tensor)
