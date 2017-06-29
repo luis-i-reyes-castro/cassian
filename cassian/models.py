@@ -21,24 +21,26 @@ from .layers import VectorDependentGatedRNN
 from .convenience import exists_file, ensure_directory
 from .convenience import serialize, de_serialize
 from .convenience import move_date
+from .convenience import save_df_to_excel
 
 # =====================================================================================
 class CassianModel :
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     OUTPUT_DIR   = '/home/luis/cassian/trained-models/'
-    OUTPUT_FILE  = 'store-[STORE-ID]-model.pkl'
-    WEIGHTS_FILE = 'store-[STORE-ID]-weights.h5'
+    OUTPUT_FILE  = 'store-[STORE-ID]_model.pkl'
+    WEIGHTS_FILE = 'store-[STORE-ID]_weights.h5'
     RESULTS_DIR  = '/home/luis/cassian/results/'
-    RESULTS_FILE = 'store-[STORE-ID].pkl'
+    RESULTS_FILE = 'store-[STORE-ID]_results.pkl'
+    SUMMARY_FILE = 'store-[STORE-ID]_summary.xlsx'
 
     dataset_filename = None
     dataset          = Dataset()
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     def __init__( self, dataset_filename, batch_size = 32, timesteps = 90,
-                        vector_embedding_dim = 64,
-                        layer_sizes = [ 512, 512, 512] ) :
+                        vector_embedding_dim = 32,
+                        layer_sizes = [ 256, 256, 256] ) :
 
         print( 'Current task: Loading Dataset instance' )
         if not exists_file( dataset_filename) :
@@ -358,7 +360,9 @@ class CassianModel :
 
                 summary.loc[ sku, 'Expected_Sales'] = predicted_sold[-1]
 
-        summary.sort_values( by = 'Expected_Sales', inplace = True)
+        summary['Days_of_Stock'] = \
+        summary['Initial_Stock'] / summary['Expected_Sales']
+        summary.sort_values( by = 'Days_of_Stock', ascending = False, inplace = True)
 
         results_dict                = {}
         results_dict['predictions'] = predictions
@@ -369,7 +373,13 @@ class CassianModel :
         results_file = self.RESULTS_DIR \
                      + self.RESULTS_FILE.replace( '[STORE-ID]', str(self.store_id))
 
-        print( 'Saving data to file:', results_file)
+        print( 'Saving results to file:', results_file)
         serialize( results_dict, results_file)
+
+        summary_file = self.RESULTS_DIR \
+                     + self.SUMMARY_FILE.replace( '[STORE-ID]', str(self.store_id))
+
+        print( 'Saving summary to file:', summary_file)
+        save_df_to_excel( summary, summary_file)
 
         return predictions, summary
