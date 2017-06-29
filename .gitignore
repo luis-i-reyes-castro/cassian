@@ -1,5 +1,7 @@
-cassian/__pycache__
+__pycache__
 dataset-*
+results
 trained-models
 *.csv
 *.png
+*.xlsx
