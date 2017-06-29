@@ -37,8 +37,8 @@ class CassianModel :
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     def __init__( self, dataset_filename, batch_size = 32, timesteps = 90,
-                        vector_embedding_dim = 32,
-                        layer_sizes = [ 256, 256, 256] ) :
+                        vector_embedding_dim = 64,
+                        layer_sizes = [ 512, 512, 512] ) :
 
         print( 'Current task: Loading Dataset instance' )
         if not exists_file( dataset_filename) :
@@ -87,7 +87,7 @@ class CassianModel :
             layer = VectorDependentGatedRNN( units = layer_size,
                                              learn_initial_state_bias = True,
                                              learn_initial_state_kernel = True,
-                                             architecture = 'single-gate',
+                                             architecture = 'double-gate',
                                              name = layer_name)
 
             input_vectors = self.embedding
