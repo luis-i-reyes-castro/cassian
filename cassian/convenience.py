@@ -65,6 +65,15 @@ def move_date( date, delta_days) :
     return date + dt.timedelta( days = delta_days)
 
 # -------------------------------------------------------------------------------------
+def save_df_to_excel( dataframe, output_file, output_sheet = 'Sheet') :
+
+    writer = pd.ExcelWriter(output_file)
+    dataframe.to_excel( writer, output_sheet)
+    writer.save
+
+    return
+
+# -------------------------------------------------------------------------------------
 def plot_timeseries( ts_1, ts_2) :
 
     COLOR_TS_1 = 'blue'
