@@ -8,23 +8,23 @@
 # -------------------------------------------------------------------------------------
 from cassian.models import CassianModel
 
-dataset = 'dataset-101/ready-dataset.pkl'
+dataset = 'dataset-103/ready-dataset.pkl'
 cassian = CassianModel( dataset, batch_size = 16, timesteps = 90)
 
-cassian.train_on_dataset( epochs = 20, workers = 8)
-cassian.save()
-cassian.train_on_dataset( epochs = 20, workers = 8)
-cassian.save()
-cassian.train_on_dataset( epochs = 20, workers = 8)
-cassian.save()
-cassian.compute_predictions()
+cassian.train_on_dataset( epochs = 1, workers = 8)
+
+#cassian.train_on_dataset( epochs = 1, workers = 8)
+#cassian.save()
+#cassian.train_on_dataset( epochs = 100, workers = 8)
+#cassian.save()
+#cassian.compute_predictions()
 
 ## -------------------------------------------------------------------------------------
 #from cassian.models import CassianModel
 #
-#model_file = 'trained-models/store-101-model.pkl'
+#model_file = 'trained-models/store-101_model.pkl'
 #cassian = CassianModel.load( model_file)
 #
-#cassian.train_on_dataset( epochs = 60, workers = 8)
-#cassian.save()
+##cassian.train_on_dataset( epochs = 60, workers = 8)
+##cassian.save()
 #cassian.compute_predictions()
