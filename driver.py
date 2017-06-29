@@ -9,8 +9,22 @@
 from cassian.models import CassianModel
 
 dataset = 'dataset-101/ready-dataset.pkl'
-cassian = CassianModel( dataset, batch_size = 24, timesteps = 90)
+cassian = CassianModel( dataset, batch_size = 16, timesteps = 90)
 
-cassian.train_on_dataset( epochs = 2, workers = 8)
-cassian.compute_predictions()
+cassian.train_on_dataset( epochs = 20, workers = 8)
 cassian.save()
+cassian.train_on_dataset( epochs = 20, workers = 8)
+cassian.save()
+cassian.train_on_dataset( epochs = 20, workers = 8)
+cassian.save()
+cassian.compute_predictions()
+
+## -------------------------------------------------------------------------------------
+#from cassian.models import CassianModel
+#
+#model_file = 'trained-models/store-101-model.pkl'
+#cassian = CassianModel.load( model_file)
+#
+#cassian.train_on_dataset( epochs = 60, workers = 8)
+#cassian.save()
+#cassian.compute_predictions()
