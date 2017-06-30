@@ -53,7 +53,7 @@ class CassianModel :
         self.store_id        = self.dataset.store_id
         self.batch_size      = batch_size
         self.timesteps       = timesteps
-        self.steps_per_epoch = self.dataset.num_timesteps % ( batch_size * timesteps )
+        self.steps_per_epoch = self.dataset.num_timesteps // ( batch_size * timesteps )
 
         self.vector_embedding_dim = vector_embedding_dim
         self.layer_sizes          = layer_sizes
