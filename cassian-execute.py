@@ -98,7 +98,6 @@ def main( argv) :
 
         if mode_train :
             cassian.train_on_dataset( epochs = epochs, workers = workers)
-            cassian.save()
         else :
             cassian.compute_predictions()
 

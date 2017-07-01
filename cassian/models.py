@@ -274,11 +274,14 @@ class CassianModel :
 
         print( 'Current task: Training for ' + str(epochs) + ' epochs' )
 
-        self.model.fit_generator( generator = batch_generator(),
-                                  steps_per_epoch = self.steps_per_epoch,
-                                  epochs = epochs,
-                                  workers = workers,
-                                  pickle_safe = True )
+        for ep in range(epochs) :
+
+            self.model.fit_generator( generator = batch_generator(),
+                                      steps_per_epoch = self.steps_per_epoch,
+                                      epochs = 1,
+                                      workers = workers,
+                                      pickle_safe = True )
+            self.save()
 
         return
 
