@@ -39,8 +39,8 @@ class CassianModel :
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     def __init__( self, dataset_filename, batch_size = 32, timesteps = 90,
-                        vector_embedding_dim = 32,
-                        layer_sizes = [ 256, 256, 256] ) :
+                        vector_embedding_dim = 64,
+                        layer_sizes = [ 512, 256, 256] ) :
 
         print( 'Current task: Loading Dataset instance' )
         if not exists_file( dataset_filename) :
@@ -89,7 +89,7 @@ class CassianModel :
             layer = VectorDependentGatedRNN( units = layer_size,
                                              learn_initial_state_bias = True,
                                              learn_initial_state_kernel = True,
-                                             architecture = 'double-gate',
+                                             architecture = 'single-gate',
                                              name = layer_name)
 
             input_vectors = self.embedding
@@ -274,14 +274,12 @@ class CassianModel :
 
         print( 'Current task: Training for ' + str(epochs) + ' epochs' )
 
-        for ep in range(epochs) :
-
-            self.model.fit_generator( generator = batch_generator(),
-                                      steps_per_epoch = self.steps_per_epoch,
-                                      epochs = 1,
-                                      workers = workers,
-                                      pickle_safe = True )
-            self.save()
+        self.model.fit_generator( generator = batch_generator(),
+                                  steps_per_epoch = self.steps_per_epoch,
+                                  epochs = epochs,
+                                  workers = workers,
+                                  pickle_safe = True )
+        self.save()
 
         return
 
