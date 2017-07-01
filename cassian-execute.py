@@ -2,26 +2,45 @@
 import sys, getopt
 from cassian.connectivity import DatabaseClient
 from cassian.data_management import Dataset
+from cassian.models import CassianModel
 
 def show_usage() :
     print( 'Cassian-Execute: Usage:' )
     print( './cassian-execute.py -h|--help' )
     print( './cassian-execute.py -l|--list' )
-    print( './cassian-execute.py -f|--fetch <store_id> [-r|--resume]' )
+    print( './cassian-execute.py -s|--store <store_id> ' +
+           '[-f|--fetch] [-r|--resume_fetch] [-l|--load] [-T|--train] ' +
+           '[-e|--epochs] <num_of_epochs> ' +
+           '[-b|--batch_size] <batch_size> ' +
+           '[-t|--timesteps] <timesteps> ' +
+           '[-w|--workers] <num_of_workers> ' +
+           '[-p|--predict]' )
 
 def main( argv) :
 
-    long_opts = [ 'help', 'list', 'fetch=', 'resume']
+    opts_short = 'hls:frlTe:b:t:w:p'
+    opts_long  = [ 'help', 'list', 'store=',
+                   'fetch', 'resume_fetch', 'load', 'train',
+                   'epochs=', 'batch_size=', 'timesteps=', 'workers=', 'predict' ]
 
     try :
-        opts, args = getopt.getopt( argv, 'hlf:r', long_opts)
+        opts, args = getopt.getopt( argv, opts_short, opts_long)
+
     except getopt.GetoptError :
         print( 'Failed to retrieve arguments and/or options!' )
         show_usage()
         sys.exit()
 
-    mode_fetch = False
-    resume     = False
+    store_id     = 0
+    mode_fetch   = False
+    resume       = False
+    mode_load    = False
+    mode_train   = False
+    epochs       = 1
+    batch_size   = 16
+    timesteps    = 90
+    workers      = 4
+    mode_predict = False
 
     for opt, arg in opts :
 
@@ -34,12 +53,31 @@ def main( argv) :
             client.get_list_of_stores()
             return
 
+        if opt in ( '-s', '--store') :
+            store_id = int(arg)
         if opt in ( '-f', '--fetch') :
             mode_fetch = True
-            store_id = int(arg)
-
-        if opt in ( '-r', '--resume') :
+        if opt in ( '-r', '--resume_fetch') :
             resume = True
+        if opt in ( '-l', '--load') :
+            mode_load = True
+        if opt in ( '-T', '--train') :
+            mode_train = True
+        if opt in ( '-e', '--epochs') :
+            epochs = max( ( epochs, int(arg) ) )
+        if opt in ( '-b', '--batch_size') :
+            batch_size = max( ( batch_size, int(arg) ) )
+        if opt in ( '-t', '--timesteps') :
+            timesteps = max( ( timesteps, int(arg) ) )
+        if opt in ( '-w', '--workers') :
+            workers = max( ( 2, int(arg) ) )
+        if opt in ( '-p', '--predict') :
+            mode_predict = True
+
+    if not store_id and ( mode_fetch or mode_load or mode_train or mode_predict ) :
+        print( 'Error: Cannot fetch, load, train or predict without a Store ID!' )
+        show_usage()
+        sys.exit()
 
     if mode_fetch :
         client = DatabaseClient( store_id = store_id)
@@ -48,6 +86,21 @@ def main( argv) :
                            reuse_downloaded_result_sets = resume)
         dataset = Dataset( raw_data_file = client.output_file)
         dataset.save()
+
+    if mode_train or mode_predict :
+
+        if mode_load :
+            model_file = 'trained-models/store-' + str(store_id) + '_model.pkl'
+            cassian = CassianModel.load( model_file)
+        else :
+            dataset = 'dataset-' + str(store_id) + '/ready-dataset.pkl'
+            cassian = CassianModel( dataset, batch_size, timesteps)
+
+        if mode_train :
+            cassian.train_on_dataset( epochs = epochs, workers = workers)
+            cassian.save()
+        else :
+            cassian.compute_predictions()
 
     return
 
