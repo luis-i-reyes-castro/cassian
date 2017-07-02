@@ -40,7 +40,7 @@ class CassianModel :
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     def __init__( self, dataset_filename, batch_size = 32, timesteps = 90,
                         vector_embedding_dim = 64,
-                        layer_sizes = [ 512, 256, 256] ) :
+                        layer_sizes = [ 256, 256, 256] ) :
 
         print( 'Current task: Loading Dataset instance' )
         if not exists_file( dataset_filename) :
@@ -115,7 +115,7 @@ class CassianModel :
         def zero_one_softsign( tensor) :
             return 0.5 + 0.5 * K.softsign( 2.0 * tensor )
 
-        layer_activations = [ K.softplus, zero_one_softsign ]
+        layer_activations = [ K.exp, zero_one_softsign ]
         layer_losses = [ 'poisson', 'binary_crossentropy' ]
 
         for ( layer_name, layer_activation, layer_loss) in \
@@ -229,7 +229,7 @@ class CassianModel :
         return
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-    def plot_model( self, filename = 'Cassian.png') :
+    def plot_model( self, filename = 'Model-Architecture.png') :
 
         return plot_model( model = self.model,
                            show_shapes = True, to_file = filename)

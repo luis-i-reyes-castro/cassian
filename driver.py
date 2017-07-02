@@ -11,7 +11,9 @@ from cassian.models import CassianModel
 dataset = 'dataset-103/ready-dataset.pkl'
 cassian = CassianModel( dataset, batch_size = 16, timesteps = 90)
 
-cassian.train_on_dataset( epochs = 1, workers = 8)
+cassian.plot_model()
+
+#cassian.train_on_dataset( epochs = 1, workers = 8)
 
 #cassian.train_on_dataset( epochs = 1, workers = 8)
 #cassian.save()
