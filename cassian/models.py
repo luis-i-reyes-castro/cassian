@@ -181,7 +181,7 @@ class CassianModel :
         return self.__dict__
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-    def save( self) :
+    def save_model( self) :
 
         output_dict = {}
         output_dict['dataset_filename']     = self.dataset_filename
@@ -194,8 +194,13 @@ class CassianModel :
         print( 'Saving CassianModel instance to file:', self.output_file)
         serialize( output_dict, self.output_file)
 
-#        print( 'Saving CassianModel weights to file:', self.weights_file)
-#        self.model.save_weights( self.weights_file)
+        return
+
+    # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+    def save_weights( self) :
+
+        print( 'Saving CassianModel weights to file:', self.weights_file)
+        self.model.save_weights( self.weights_file)
 
         return
 
@@ -282,13 +287,14 @@ class CassianModel :
                                        save_weights_only = True,
                                        save_best_only = True) ]
 
+        self.save_model()
         self.model.fit_generator( generator = batch_generator(),
                                   steps_per_epoch = self.steps_per_epoch,
                                   epochs = epochs,
                                   workers = workers,
                                   callbacks = callbacks,
                                   pickle_safe = True )
-        self.save()
+
 
         return
 
