@@ -279,7 +279,8 @@ class CassianModel :
 
         callbacks = [ ModelCheckpoint( self.weights_file,
                                        monitor = 'loss', mode = 'min',
-                                       save_weights_only = True) ]
+                                       save_weights_only = True,
+                                       save_best_only = True) ]
 
         self.model.fit_generator( generator = batch_generator(),
                                   steps_per_epoch = self.steps_per_epoch,
