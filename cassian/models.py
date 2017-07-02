@@ -14,6 +14,7 @@ from keras import backend as K
 from keras.layers import Input, Dense
 from keras.layers.wrappers import TimeDistributed
 from keras.models import Model
+from keras.callbacks import ModelCheckpoint
 from keras.utils.vis_utils import plot_model
 
 from .data_management import Dataset, BatchSpecifications, BatchSample
@@ -158,10 +159,19 @@ class CassianModel :
             self.outputs_list.append( output_tensor)
             self.loss_functions[layer_name] = layer_losses
 
+        # -----------------------------------------------------------------------------
         self.model = Model( inputs = [ self.X_vecs, self.X_ts],
                             outputs = self.outputs_list )
 
         self.model.compile( optimizer = 'adam', loss = self.loss_functions)
+
+        # -----------------------------------------------------------------------------
+        ensure_directory( self.OUTPUT_DIR)
+
+        self.output_file  = self.OUTPUT_DIR \
+                          + self.OUTPUT_FILE.replace( '[STORE-ID]', str(self.store_id))
+        self.weights_file = self.OUTPUT_DIR \
+                          + self.WEIGHTS_FILE.replace( '[STORE-ID]', str(self.store_id))
 
         return
 
@@ -173,26 +183,19 @@ class CassianModel :
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     def save( self) :
 
-        ensure_directory( self.OUTPUT_DIR)
-
-        output_file  = self.OUTPUT_DIR \
-                     + self.OUTPUT_FILE.replace( '[STORE-ID]', str(self.store_id))
-        weights_file = self.OUTPUT_DIR \
-                     + self.WEIGHTS_FILE.replace( '[STORE-ID]', str(self.store_id))
-
         output_dict = {}
         output_dict['dataset_filename']     = self.dataset_filename
         output_dict['batch_size']           = self.batch_size
         output_dict['timesteps']            = self.timesteps
         output_dict['vector_embedding_dim'] = self.vector_embedding_dim
         output_dict['layer_sizes']          = self.layer_sizes
-        output_dict['weights_filename']     = weights_file
+        output_dict['weights_filename']     = self.weights_file
 
-        print( 'Saving CassianModel instance to file:', output_file)
-        serialize( output_dict, output_file)
+        print( 'Saving CassianModel instance to file:', self.output_file)
+        serialize( output_dict, self.output_file)
 
-        print( 'Saving CassianModel weights to file:', weights_file)
-        self.model.save_weights( weights_file)
+#        print( 'Saving CassianModel weights to file:', self.weights_file)
+#        self.model.save_weights( self.weights_file)
 
         return
 
@@ -274,10 +277,15 @@ class CassianModel :
 
         print( 'Current task: Training for ' + str(epochs) + ' epochs' )
 
+        callbacks = [ ModelCheckpoint( self.weights_file,
+                                       monitor = 'loss', mode = 'min',
+                                       save_weights_only = True) ]
+
         self.model.fit_generator( generator = batch_generator(),
                                   steps_per_epoch = self.steps_per_epoch,
                                   epochs = epochs,
                                   workers = workers,
+                                  callbacks = callbacks,
                                   pickle_safe = True )
         self.save()
 
