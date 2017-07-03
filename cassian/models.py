@@ -269,12 +269,12 @@ class CassianModel :
 
                 random_seeds = np.random.rand( self.batch_size)
 
-                for ( i, sku) in enumerate(batch_skus) :
+                for ( sample_i, sku) in enumerate( batch_skus ) :
 
-                    ( inputs, targets) = \
-                    self.dataset(sku).get_sample( self.timesteps, random_seeds[i])
-
-                    batch_sample.include_sample( inputs, targets)
+                    self.dataset(sku).get_sample( timesteps = self.timesteps,
+                                                  seed = random_seeds[sample_i],
+                                                  batch_sample = batch_sample,
+                                                  sample_index = sample_i)
 
                 yield [ batch_sample.inputs, batch_sample.targets ]
 
