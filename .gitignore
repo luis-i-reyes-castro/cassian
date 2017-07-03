@@ -1,7 +1,5 @@
 __pycache__
 dataset-*
-results
-trained-models
 *.csv
 *.png
 *.xlsx
