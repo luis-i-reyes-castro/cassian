@@ -4,7 +4,7 @@
 #dataset = 'dataset-103/ready-dataset.pkl'
 #cassian = CassianModel( dataset, batch_size = 16, timesteps = 90)
 #
-#cassian.save_model()
+#cassian.model.summary()
 
 # -------------------------------------------------------------------------------------
 from cassian.convenience import de_serialize
