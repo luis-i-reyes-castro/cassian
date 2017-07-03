@@ -17,7 +17,8 @@ from keras.models import Model
 from keras.callbacks import ModelCheckpoint
 from keras.utils.vis_utils import plot_model
 
-from .data_management import Dataset, BatchSpecifications, BatchSample
+from .data_management import Dataset
+from .batching import BatchSpecifications, BatchSample
 from .layers import VectorDependentGatedRNN
 from .convenience import exists_file, ensure_directory
 from .convenience import serialize, de_serialize
@@ -35,8 +36,7 @@ class CassianModel :
     RESULTS_FILE = 'store-[STORE-ID]_results.pkl'
     SUMMARY_FILE = 'store-[STORE-ID]_summary.xlsx'
 
-    dataset_filename = None
-    dataset          = Dataset()
+    dataset = Dataset()
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     def __init__( self, dataset_filename, batch_size = 32, timesteps = 90,
@@ -139,11 +139,11 @@ class CassianModel :
         # sparse categorical cross-entropy
 
         layer_names = [ 'Replenished', 'Returned', 'Trashed', 'Found', 'Missing' ]
-        layer_dims  = [ self.dataset.ts_replenished_dim,
-                        self.dataset.ts_returned_dim,
-                        self.dataset.ts_trashed_dim,
-                        self.dataset.ts_found_dim,
-                        self.dataset.ts_missing_dim ]
+        layer_dims  = [ self.dataset.z_replenished_dim,
+                        self.dataset.z_returned_dim,
+                        self.dataset.z_trashed_dim,
+                        self.dataset.z_found_dim,
+                        self.dataset.z_missing_dim ]
         layer_losses = 'sparse_categorical_crossentropy'
 
         for ( layer_name, layer_dim) in zip( layer_names, layer_dims) :
@@ -253,11 +253,11 @@ class CassianModel :
             batch_specs.vec_dim    = self.dataset.vec_dim
             batch_specs.ts_dim     = self.dataset.ts_dim
 
-            batch_specs.ts_replenished_dim = self.dataset.ts_replenished_dim
-            batch_specs.ts_returned_dim    = self.dataset.ts_returned_dim
-            batch_specs.ts_trashed_dim     = self.dataset.ts_trashed_dim
-            batch_specs.ts_found_dim       = self.dataset.ts_found_dim
-            batch_specs.ts_missing_dim     = self.dataset.ts_missing_dim
+            batch_specs.ts_replenished_dim = self.dataset.z_replenished_dim
+            batch_specs.ts_returned_dim    = self.dataset.z_returned_dim
+            batch_specs.ts_trashed_dim     = self.dataset.z_trashed_dim
+            batch_specs.ts_found_dim       = self.dataset.z_found_dim
+            batch_specs.ts_missing_dim     = self.dataset.z_missing_dim
 
             batch_sample = BatchSample( batch_specs)
 
