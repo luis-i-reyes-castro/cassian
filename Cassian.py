@@ -36,7 +36,7 @@ def main( argv) :
     epochs       = 1
     batch_size   = 16
     timesteps    = 90
-    workers      = 4
+    workers      = 2
     mode_predict = False
 
     for opt, arg in opts :
