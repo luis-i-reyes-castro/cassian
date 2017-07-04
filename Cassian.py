@@ -11,14 +11,19 @@ def show_usage() :
            '[-b|--batch_size] <batch_size> ' +
            '[-t|--timesteps] <timesteps> ' +
            '[-w|--workers] <num_of_workers> ' +
-           '[-p|--predict]' )
+           '[-P|--predict] [-p|--plot] <SKU>' )
 
 def main( argv) :
 
-    opts_short = 'hls:frlTe:b:t:w:p'
+    opts_short = 'hls:frlTe:b:t:w:Pp:'
     opts_long  = [ 'help', 'list', 'store=',
                    'fetch', 'resume_fetch', 'load', 'train',
-                   'epochs=', 'batch_size=', 'timesteps=', 'workers=', 'predict' ]
+                   'epochs=', 'batch_size=', 'timesteps=', 'workers=',
+                   'predict', 'plot=' ]
+
+    model_file   = 'trained-models/store-[STORE-ID]_model.pkl'
+    dataset_file = 'dataset-[STORE-ID]/ready-dataset.pkl'
+    results_file = 'results/store-[STORE-ID]_results.pkl'
 
     try :
         opts, args = getopt.getopt( argv, opts_short, opts_long)
@@ -38,6 +43,8 @@ def main( argv) :
     timesteps    = 90
     workers      = 2
     mode_predict = False
+    mode_plot    = False
+    sku_to_plot  = None
 
     for opt, arg in opts :
 
@@ -81,10 +88,16 @@ def main( argv) :
         if opt in ( '-w', '--workers') :
             workers = max( ( 2, int(arg) ) )
 
-        if opt in ( '-p', '--predict') :
+        if opt in ( '-P', '--predict') :
             mode_predict = True
 
-    if not store_id and ( mode_fetch or mode_load or mode_train or mode_predict ) :
+        if opt in ( '-p', '--plot') :
+            mode_plot   = True
+            sku_to_plot = int(arg)
+
+    if not store_id and \
+    ( mode_fetch or mode_load or mode_train or mode_predict or mode_plot ) :
+
         print( 'Error: Cannot fetch, load, train or predict without a Store ID!' )
         show_usage()
         sys.exit()
@@ -102,21 +115,40 @@ def main( argv) :
         dataset = Dataset( raw_data_file = client.output_file)
         dataset.save()
 
-    if mode_load or mode_train or mode_predict :
+    if mode_train :
 
         from cassian.models import CassianModel
 
         if mode_load :
-            model_file = 'trained-models/store-' + str(store_id) + '_model.pkl'
-            cassian = CassianModel.load( model_file)
+            model_file = model_file.replace( '[STORE-ID]', str(store_id))
+            cassian    = CassianModel.load( model_file)
         else :
-            dataset = 'dataset-' + str(store_id) + '/ready-dataset.pkl'
+            dataset = dataset_file.replace( '[STORE-ID]', str(store_id))
             cassian = CassianModel( dataset, batch_size, timesteps)
 
-        if mode_train :
-            cassian.train_on_dataset( epochs = epochs, workers = workers)
-        else :
-            cassian.compute_predictions()
+        cassian.train_on_dataset( epochs = epochs, workers = workers)
+
+    if mode_predict :
+
+        from cassian.models import CassianModel
+
+        model_file = model_file.replace( '[STORE-ID]', str(store_id))
+        cassian    = CassianModel.load( model_file)
+
+        cassian.compute_predictions()
+
+    if mode_plot :
+
+        from cassian.convenience import de_serialize
+        import matplotlib.pyplot as plt
+
+        results_file = results_file.replace( '[STORE-ID]', str(store_id))
+        results      = de_serialize( results_file)
+        predictions  = results['predictions']
+
+        plt.style.use('ggplot')
+        predictions[sku_to_plot].plot()
+        plt.show()
 
     return
 

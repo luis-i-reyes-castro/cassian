@@ -9,6 +9,7 @@ import pyodbc
 from datetime import datetime as dtdt
 from .convenience import exists_file, ensure_directory
 from .convenience import de_serialize, serialize
+from .convenience import save_df_to_excel
 from .convenience import get_date_today, move_date
 
 # =====================================================================================
@@ -85,18 +86,20 @@ class DatabaseClient :
                   'CIUDAD, FECHA_APERTURA FROM DW_SUCURSAL_DIM' + '\n'
         df      = self.execute_query( query)
 
-        replace = { 'COD_SUCURSAL' : 'ID',
-                    'NOM_SUCURSAL' : 'NAME',
-                    'FORMATO' : 'FORMAT',
-                    'TIPO'  : 'TYPE',
-                    'CIUDAD' : 'CITY',
+        replace = { 'COD_SUCURSAL'   : 'STORE-ID',
+                    'NOM_SUCURSAL'   : 'NAME',
+                    'FORMATO'        : 'FORMAT',
+                    'TIPO'           : 'TYPE',
+                    'CIUDAD'         : 'CITY',
                     'FECHA_APERTURA' : 'OPENING_DATE' }
 
         df.rename( columns = replace, inplace = True)
-        df.sort_values( by = 'ID', inplace = True)
 
-        print( 'Saving data to file list-of-stores.csv.' )
-        df.to_csv( 'list-of-stores.csv', index = False)
+        df.set_index( keys = 'STORE-ID', inplace = True)
+        df.sort_index( inplace = True)
+
+        print( 'Saving data to file List-of-Stores.xlsx.' )
+        save_df_to_excel( df, 'List-of-Stores.xlsx', 'Stores')
 
         return
 
