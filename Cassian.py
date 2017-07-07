@@ -2,16 +2,26 @@
 import sys, getopt
 
 def show_usage() :
-    print( 'CASSIAN - Usage:' )
-    print( './Cassian.py -h|--help' )
-    print( './Cassian.py -l|--list' )
-    print( './Cassian.py -s|--store <store_id> ' +
-           '[-f|--fetch] [-r|--resume_fetch] [-l|--load] [-T|--train] ' +
+    print( '========================================' )
+    print( 'CASSIAN Decision Support System - Usage:' )
+    print( '----------------------------------------' )
+    print( '(+) Print this manual:' )
+    print( '    ./Cassian.py -h|--help' )
+    print( '(+) Print a list of stores:' )
+    print( '    ./Cassian.py -l|--list' )
+    print( '(+) Fetch data for training or prediction:' )
+    print( '    ./Cassian.py -s|--store <store_id> -f|--fetch [-r|--resume_fetch]' )
+    print( '(+) Train a new model or load and re-train a saved one:' )
+    print( '    ./Cassian.py -s|--store <store_id> -T|--train [-l|--load] ' +
            '[-e|--epochs] <num_of_epochs> ' +
            '[-b|--batch_size] <batch_size> ' +
            '[-t|--timesteps] <timesteps> ' +
-           '[-w|--workers] <num_of_workers> ' +
-           '[-P|--predict] [-p|--plot] <SKU>' )
+           '[-w|--workers] <num_of_workers> ' )
+    print( '(+) Compute predictions and generate store summary:' )
+    print( '    ./Cassian.py -s|--store <store_id> -P|--predict' )
+    print( '(+) Plot history of stock, sales and sale predictions for an SKU:' )
+    print( '    ./Cassian.py -s|--store <store_id> -p|--plot <SKU>' )
+    print( '====================================================' )
 
 def main( argv) :
 
