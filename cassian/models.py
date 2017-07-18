@@ -58,7 +58,6 @@ class CassianModel :
 
         self.vector_embedding_dim = vector_embedding_dim
         self.layer_sizes          = layer_sizes
-        self.learnable_layers     = []
         self.outputs_list         = []
         self.loss_functions       = {}
 
@@ -77,7 +76,6 @@ class CassianModel :
         self.embedding = Dense( units = self.vector_embedding_dim,
                                 activation = 'softsign',
                                 name = layer_name )( self.X_vecs)
-        self.learnable_layers.append( layer_name )
 
         # -----------------------------------------------------------------------------
         # Builds a stack of several layers of Vector-dependent gated RNNs
@@ -100,7 +98,6 @@ class CassianModel :
             output_timeseries = layer( [ input_vectors, input_timeseries] )
             # shape = ( batch_size, None, layer_dim)
 
-            self.learnable_layers.append( layer_name )
             self.layer_outputs.append( output_timeseries )
 
         self.layer_outputs = self.layer_outputs[1:]
@@ -129,7 +126,6 @@ class CassianModel :
             output_tensor = \
             TimeDistributed( dense_layer, name = layer_name)( self.layer_outputs[-1] )
 
-            self.learnable_layers.append( layer_name)
             self.outputs_list.append( output_tensor)
             self.loss_functions[layer_name] = layer_loss
 
@@ -155,7 +151,6 @@ class CassianModel :
             output_tensor = \
             TimeDistributed( dense_layer, name = layer_name)( self.layer_outputs[-1] )
 
-            self.learnable_layers.append( layer_name)
             self.outputs_list.append( output_tensor)
             self.loss_functions[layer_name] = layer_losses
 
@@ -224,17 +219,6 @@ class CassianModel :
         cassian.model.compile( optimizer = 'adam', loss = cassian.loss_functions)
 
         return cassian
-
-    # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-    def copy_weights( self, original_model) :
-
-        for layer in self.learnable_layers :
-
-            original_weights = original_model.get_layer(layer).get_weights()
-
-            self.model.get_layer(layer).set_weights( original_weights )
-
-        return
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     def plot_model( self, filename = 'Model-Architecture.png') :
