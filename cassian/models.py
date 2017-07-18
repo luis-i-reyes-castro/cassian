@@ -40,7 +40,7 @@ class CassianModel :
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     def __init__( self, dataset_filename, batch_size = 32, timesteps = 90,
-                        vector_embedding_dim = 64,
+                        vector_embedding_dim = 32,
                         layer_sizes = [ 256, 256, 256] ) :
 
         print( 'Current task: Loading Dataset instance' )

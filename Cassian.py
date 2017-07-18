@@ -118,7 +118,7 @@ def main( argv) :
         from cassian.data_management import Dataset
 
         client = DatabaseClient( store_id = store_id)
-        client.fetch_data( intro_year_limit = 2015,
+        client.fetch_data( intro_year_limit = 2016,
                            min_num_of_records = 180,
                            reuse_downloaded_result_sets = resume)
 
