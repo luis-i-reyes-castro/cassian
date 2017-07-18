@@ -58,7 +58,6 @@ class CassianModel :
 
         self.vector_embedding_dim = vector_embedding_dim
         self.layer_sizes          = layer_sizes
-        self.learnable_layers     = []
         self.outputs_list         = []
         self.loss_functions       = {}
 
@@ -77,12 +76,11 @@ class CassianModel :
         self.embedding = Dense( units = self.vector_embedding_dim,
                                 activation = 'softsign',
                                 name = layer_name )( self.X_vecs)
-        self.learnable_layers.append( layer_name )
 
         # -----------------------------------------------------------------------------
         # Builds a stack of several layers of Vector-dependent gated RNNs
 
-        self.layer_outputs = [ self.X_ts ]
+        self.last_outout = self.X_ts
 
         for ( i, layer_size) in enumerate( self.layer_sizes) :
 
@@ -95,15 +93,8 @@ class CassianModel :
 
             input_vectors = self.embedding
             # shape = ( batch_size, embedding_dim)
-            input_timeseries = self.layer_outputs[-1]
-            # shape = ( batch_size, None, timeseries_input_dim or prev_layer_dim)
-            output_timeseries = layer( [ input_vectors, input_timeseries] )
+            self.last_outout = layer( [ input_vectors, self.last_outout] )
             # shape = ( batch_size, None, layer_dim)
-
-            self.learnable_layers.append( layer_name )
-            self.layer_outputs.append( output_timeseries )
-
-        self.layer_outputs = self.layer_outputs[1:]
 
         # -----------------------------------------------------------------------------
         # Builds the first two output timeseries: sold and is-on-sale
@@ -127,9 +118,8 @@ class CassianModel :
                                  activation = layer_activation)
 
             output_tensor = \
-            TimeDistributed( dense_layer, name = layer_name)( self.layer_outputs[-1] )
+            TimeDistributed( dense_layer, name = layer_name)( self.last_outout )
 
-            self.learnable_layers.append( layer_name)
             self.outputs_list.append( output_tensor)
             self.loss_functions[layer_name] = layer_loss
 
@@ -153,9 +143,8 @@ class CassianModel :
                                  activation = 'softmax')
 
             output_tensor = \
-            TimeDistributed( dense_layer, name = layer_name)( self.layer_outputs[-1] )
+            TimeDistributed( dense_layer, name = layer_name)( self.last_outout )
 
-            self.learnable_layers.append( layer_name)
             self.outputs_list.append( output_tensor)
             self.loss_functions[layer_name] = layer_losses
 
@@ -224,17 +213,6 @@ class CassianModel :
         cassian.model.compile( optimizer = 'adam', loss = cassian.loss_functions)
 
         return cassian
-
-    # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-    def copy_weights( self, original_model) :
-
-        for layer in self.learnable_layers :
-
-            original_weights = original_model.get_layer(layer).get_weights()
-
-            self.model.get_layer(layer).set_weights( original_weights )
-
-        return
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     def plot_model( self, filename = 'Model-Architecture.png') :
