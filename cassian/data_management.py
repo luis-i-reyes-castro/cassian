@@ -69,7 +69,7 @@ class Dataset :
 
             self.bins = [ -1, 0, 1, 2, 3, 4, 5, 6, 8, 10, 12 ]
 
-            increment_steps = 6
+            increment_steps = 4
             increment_value = 12
 
             while self.bins[-1] < max_val :
