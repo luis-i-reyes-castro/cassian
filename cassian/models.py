@@ -227,7 +227,7 @@ class CassianModel :
         return cassian
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-    def plot_model( self, filename = 'Model-Architecture.png') :
+    def plot_model( self, filename = 'Model-Architecture.jpg') :
 
         return plot_model( model = self.model,
                            show_shapes = True, to_file = filename)

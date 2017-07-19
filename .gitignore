@@ -3,5 +3,5 @@ dataset-*
 layers.py
 results
 trained-models
-*.png
+*.jpg
 *.xlsx
