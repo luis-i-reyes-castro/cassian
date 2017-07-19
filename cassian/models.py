@@ -14,7 +14,8 @@ from keras import backend as K
 from keras.layers import Input, Dense
 from keras.layers.wrappers import TimeDistributed
 from keras.models import Model
-from keras.callbacks import ModelCheckpoint
+from keras import optimizers
+from keras.callbacks import ModelCheckpoint, EarlyStopping
 from keras.utils.vis_utils import plot_model
 
 from .data_management import Dataset
@@ -39,8 +40,8 @@ class CassianModel :
     dataset = Dataset()
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-    def __init__( self, dataset_filename, batch_size = 32, timesteps = 90,
-                        vector_embedding_dim = 32,
+    def __init__( self, dataset_filename, batch_size, timesteps,
+                        vector_embedding_dim = 64,
                         layer_sizes = [ 256, 256, 256] ) :
 
         print( 'Current task: Loading Dataset instance' )
@@ -151,8 +152,7 @@ class CassianModel :
         # -----------------------------------------------------------------------------
         self.model = Model( inputs = [ self.X_vecs, self.X_ts],
                             outputs = self.outputs_list )
-
-        self.model.compile( optimizer = 'adam', loss = self.loss_functions)
+        self.compile_model()
 
         # -----------------------------------------------------------------------------
         ensure_directory( self.OUTPUT_DIR)
@@ -161,6 +161,17 @@ class CassianModel :
                           + self.OUTPUT_FILE.replace( '[STORE-ID]', str(self.store_id))
         self.weights_file = self.OUTPUT_DIR \
                           + self.WEIGHTS_FILE.replace( '[STORE-ID]', str(self.store_id))
+
+        return
+
+    # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+    def compile_model( self) :
+
+        self.optimizer = optimizers.Adam( lr = 2e-4,
+                                          beta_1 = 0.9,
+                                          beta_2 = 0.99 )
+
+        self.model.compile( optimizer = self.optimizer, loss = self.loss_functions)
 
         return
 
@@ -210,7 +221,8 @@ class CassianModel :
                                 input_dict['layer_sizes'] )
 
         cassian.model.load_weights( input_dict['weights_filename'] )
-        cassian.model.compile( optimizer = 'adam', loss = cassian.loss_functions)
+
+        cassian.compile_model()
 
         return cassian
 
@@ -263,7 +275,11 @@ class CassianModel :
         callbacks = [ ModelCheckpoint( self.weights_file,
                                        monitor = 'loss', mode = 'min',
                                        save_weights_only = True,
-                                       save_best_only = True) ]
+                                       save_best_only = True),
+                      EarlyStopping( monitor = 'loss',
+                                     patience = 2, mode = 'min'),
+                      EarlyStopping( monitor = 'Replenished_loss',
+                                     patience = 2, mode = 'min') ]
 
         self.save_model()
         self.model.fit_generator( generator = batch_generator(),
@@ -272,7 +288,6 @@ class CassianModel :
                                   workers = workers,
                                   callbacks = callbacks,
                                   pickle_safe = True )
-
 
         return
 
