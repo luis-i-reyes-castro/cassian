@@ -49,7 +49,7 @@ def main( argv) :
     mode_load    = False
     mode_train   = False
     epochs       = 1
-    batch_size   = 16
+    batch_size   = 32
     timesteps    = 90
     workers      = 2
     mode_predict = False
