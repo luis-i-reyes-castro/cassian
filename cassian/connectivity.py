@@ -30,6 +30,11 @@ class DatabaseClient :
         self.data_source = data_source_name
         self.store_id    = store_id
 
+        self.output_dir = self.OUTPUT_DIR.replace( '[STORE-ID]', str( self.store_id))
+        ensure_directory( self.output_dir)
+
+        self.output_file = self.output_dir + self.OUTPUT_FILE
+
         return
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
@@ -105,9 +110,6 @@ class DatabaseClient :
                           min_num_of_records,
                           reuse_downloaded_result_sets = False) :
 
-        self.output_dir = self.OUTPUT_DIR.replace( '[STORE-ID]', str( self.store_id))
-        ensure_directory( self.output_dir)
-
         self.intro_year_limit = intro_year_limit
         self.dic_replacements = {}
         self.dic_replacements[ '[STORE-ID]' ] = str( self.store_id)
@@ -152,8 +154,6 @@ class DatabaseClient :
         data_object['store-id']   = self.store_id
         data_object['sku-info']   = df_sku_info
         data_object['timeseries'] = df_timeseries
-
-        self.output_file = self.output_dir + self.OUTPUT_FILE
 
         print( 'Saving data to file:', self.output_file)
         serialize( data_object, self.output_file)
