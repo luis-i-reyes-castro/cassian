@@ -115,12 +115,13 @@ class Dataset :
 
         self.store_id    = raw_data['store-id']
         big_df           = raw_data['timeseries']
-        preselected_skus = raw_data['sku-info'].index.tolist()
+        preselected_skus = raw_data['sku-info']['SKU_A'].tolist()
 
         print( 'Current task: Selecting SKUs with sufficient timeseries data ' +
                'and processing the timeseries' )
 
         self.sku_timeseries = {}
+        skus_to_drop = []
 
         for sku in preselected_skus :
 
@@ -129,10 +130,17 @@ class Dataset :
 
             if len( sku_df ) >= min_num_of_records + 1 :
                 self.sku_timeseries[ sku] = sku_df
+            else :
+                skus_to_drop.append(sku)
+
+        # serialize( self.sku_timeseries, 'sku_timeseries.pkl')
+        # serialize( skus_to_drop, 'skus_to_drop.pkl')
+
+        # self.sku_timeseries = de_serialize( 'sku_timeseries.pkl' )
+        # skus_to_drop = de_serialize( 'skus_to_drop.pkl' )
 
         print( 'Current task: Processing SKU static information' )
-        selected_skus = self.sku_timeseries.keys()
-        self.process_sku_information( raw_data['sku-info'], selected_skus)
+        self.process_sku_information( raw_data['sku-info'], skus_to_drop)
 
         self.num_skus     = len( self.info_main )
         self.list_of_skus = self.info_main.index.tolist()
@@ -162,7 +170,7 @@ class Dataset :
 
             print( 'Building SkuData object for SKU:', str(sku))
             self.data[sku] = SkuData( vector = self.vectors.loc[sku],
-                                      timeseries = raw_data['timeseries'][ sku] )
+                                      timeseries = self.sku_timeseries[ sku] )
 
             self.data[sku].z_replenished = \
             self.categorizer['Z1'].categorize( self.data[sku].y_replenished )
@@ -340,11 +348,11 @@ class Dataset :
         return df
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-    def process_sku_information( self, sku_information_df, selected_skus) :
+    def process_sku_information( self, sku_information_df, skus_to_drop) :
 
         df = sku_information_df
         df.set_index( 'SKU_A', inplace = True)
-        df = df[ df.index.isin( selected_skus ) ]
+        df.drop( labels = skus_to_drop, axis = 0, inplace = True)
 
         selected_sections = self.select_sections(df)
 
@@ -415,18 +423,18 @@ class Dataset :
                 function( self.sku_timeseries[ index][ col_name[:-4] ] )
 
         # -----------------------------------------------------------------------------
-        self.sku_info_main      = df[ section_cols + binary_cols ]
-        self.sku_info_replenish = df[ replenish_cols ]
-        self.sku_info_other     = df[ other_cols ]
+        self.info_main      = df[ section_cols + binary_cols ]
+        self.info_replenish = df[ replenish_cols ]
+        self.info_other     = df[ other_cols ]
 
         # -----------------------------------------------------------------------------
         description_cols = [ column + '_NAME' for column in section_cols ]
         description_cols.append( 'DESCRIPTION' )
 
-        self.sku_info_description = df[ description_cols ].copy()
+        self.info_description = df[ description_cols ].copy()
 
         replace = { description_cols[i] : section_cols[i] for i in range(3) }
-        self.sku_info_description.rename( columns = replace, inplace = True)
+        self.info_description.rename( columns = replace, inplace = True)
 
         return
 
