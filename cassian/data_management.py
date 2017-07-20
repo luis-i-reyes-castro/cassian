@@ -146,6 +146,8 @@ class Dataset :
         self.list_of_skus = self.info_main.index.tolist()
 
         self.vectors = pd.get_dummies( self.info_main)
+        
+        self.vectors= pd.concat([self.vectors, self.info_replenish['UNITS_PER_REP']], axis=1)
 
         self.categorizer = {}
 
