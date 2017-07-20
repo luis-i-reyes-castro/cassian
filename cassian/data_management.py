@@ -105,7 +105,7 @@ class Dataset :
             return cp.deepcopy(self)
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-    def __init__( self, raw_data_file, min_num_of_records = 180) :
+    def __init__( self, raw_data_file, min_num_of_records = 180, prob_func='timesteps') :
 
         if not exists_file( raw_data_file) :
             raise ValueError( 'Did not find file:', str(raw_data_file))
@@ -199,7 +199,7 @@ class Dataset :
             self.data[sku].z_missing_dim = \
             self.categorizer['Z5'].num_categories
 
-        self.update_num_timesteps_and_list_of_sku_probs()
+        self.update_num_timesteps_and_list_of_sku_probs(prob_func)
 
         arbitrary_sku_obj      = self.data[ self.list_of_skus[0] ]
         self.vec_dim           = arbitrary_sku_obj.vec_dim
@@ -517,18 +517,36 @@ class Dataset :
         return de_serialize( dataset_filename)
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-    def update_num_timesteps_and_list_of_sku_probs( self) :
+    def update_num_timesteps_and_list_of_sku_probs( self,prob_func='timesteps') :
 
         self.num_timesteps = 0
         self.list_of_sku_probs = [ 0.0 for sku in self.list_of_skus ]
-
+        
         for sku in self.list_of_skus :
             self.num_timesteps += self.data[sku].num_timesteps
+            
+        if prob_func == 'timesteps':
 
-        for ( i, sku) in enumerate( self.list_of_skus ) :
-            self.list_of_sku_probs[i] = \
-            float( self.data[sku].num_timesteps) / self.num_timesteps
-
+            for ( i, sku) in enumerate( self.list_of_skus ) :
+                self.list_of_sku_probs[i] = \
+                float( self.data[sku].num_timesteps) / self.num_timesteps
+                
+        if prob_func == 'utility':
+            
+            expected_utlity_sku=[]
+            
+            for sku in self.list_of_skus :
+                frequency=self.data[sku].timeseries['SOLD'].value_counts()
+                frequency_df=pd.Series.to_frame(frequency)
+                total=sum(frequency)
+                frequency_df['Probability']=frequency_df[0]/total
+                frequency_df['Expected_p']=frequency_df['Probability']*frequency_df.index
+                expected_utlity_sku.append(sum(frequency_df['Expected_p']))
+                
+            for ( i, sku) in enumerate( self.list_of_skus ) :
+                self.list_of_sku_probs[i] = \
+                float( self.info_replenish.loc[sku,'UNIT_UTILITY']) * expected_utlity_sku[i]
+        
         return
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
