@@ -156,8 +156,9 @@ class DatabaseClient :
         self.sku_timeseries = {}
         for sku in preselected_skus :
             sku_df = df[ df['SKU_A'] == sku ]
+            sku_df = self.process_sku_timeseries( sku_df)
             if len( sku_df ) >= min_num_of_records + 1 :
-                self.sku_timeseries[ sku] = self.process_sku_timeseries( sku_df)
+                self.sku_timeseries[ sku] = sku_df
 
         selected_skus = self.sku_timeseries.keys()
         self.dic_replacements[ '[SELECTED_SKUS]' ] = str( tuple(selected_skus) )
