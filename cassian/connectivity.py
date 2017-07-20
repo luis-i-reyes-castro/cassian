@@ -148,42 +148,25 @@ class DatabaseClient :
         preselected_skus = df['SKU_A'].tolist()
         self.dic_replacements[ '[PRESELECTED_SKUS]' ] = str( tuple(preselected_skus) )
 
-        df = self.execute_download_phase( 2, reuse_downloaded_result_sets)
-
-        print( 'Current task: Selecting SKUs with sufficient timeseries data ' +
-               'and processing the timeseries' )
-
-        self.sku_timeseries = {}
-        for sku in preselected_skus :
-            sku_df = df[ df['SKU_A'] == sku ]
-            sku_df = self.process_sku_timeseries( sku_df)
-            if len( sku_df ) >= min_num_of_records + 1 :
-                self.sku_timeseries[ sku] = sku_df
-
-        selected_skus = self.sku_timeseries.keys()
-        self.dic_replacements[ '[SELECTED_SKUS]' ] = str( tuple(selected_skus) )
-
-        df = self.execute_download_phase( 3, reuse_downloaded_result_sets)
-
-        print( 'Current task: Processing SKU static information' )
-        self.process_sku_information(df)
+        df_timeseries = self.execute_download_phase( 2, reuse_downloaded_result_sets)
+        df_sku_info   = self.execute_download_phase( 3, reuse_downloaded_result_sets)
 
         data_object = {}
-        data_object['store-id']         = self.store_id
-        data_object['timeseries']       = self.sku_timeseries
-        data_object['info-main']        = self.sku_info_main
-        data_object['info-replenish']   = self.sku_info_replenish
-        data_object['info-other']       = self.sku_info_other
-        data_object['info-description'] = self.sku_info_description
+        data_object['store-id']   = self.store_id
+        data_object['sku-info']   = df_sku_info
+        data_object['timeseries'] = df_timeseries
 
         self.output_file = self.output_dir + self.OUTPUT_FILE
+
         print( 'Saving data to file:', self.output_file)
         serialize( data_object, self.output_file)
 
-        return
+        return data_object
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-    def execute_download_phase( self, phase, reuse_downloaded_result_sets = False) :
+    def execute_download_phase( self, phase,
+                                reuse_downloaded_result_sets = False,
+                                serialize_for_debugging = False ) :
 
         script = self.SQL_SCRIPT.replace( '[PHASE]', str(phase))
         query = self.read_sql_script( script)
@@ -208,7 +191,9 @@ class DatabaseClient :
                 print( 'Did not find file:', df_file_path )
 
         df = self.execute_query( query, self.dic_replacements)
-        serialize( df, df_file_path)
+
+        if serialize_for_debugging :
+            serialize( df, df_file_path)
 
         return df
 
