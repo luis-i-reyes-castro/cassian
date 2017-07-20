@@ -107,7 +107,6 @@ class DatabaseClient :
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     def fetch_data( self, intro_year_limit,
-                          min_num_of_records,
                           reuse_downloaded_result_sets = False) :
 
         self.intro_year_limit = intro_year_limit

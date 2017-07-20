@@ -119,10 +119,10 @@ def main( argv) :
 
         client = DatabaseClient( store_id = store_id)
         client.fetch_data( intro_year_limit = 2016,
-                           min_num_of_records = 180,
                            reuse_downloaded_result_sets = resume)
 
-        dataset = Dataset( raw_data_file = client.output_file)
+        dataset = Dataset( raw_data_file = client.output_file,
+                           min_num_of_records = 180)
         dataset.save()
 
     if mode_train :
