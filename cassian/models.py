@@ -37,8 +37,6 @@ class CassianModel :
     RESULTS_FILE = 'store-[STORE-ID]_results.pkl'
     SUMMARY_FILE = 'store-[STORE-ID]_summary.xlsx'
 
-    dataset = Dataset()
-
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     def __init__( self, dataset_filename, batch_size, timesteps,
                         vector_embedding_dim = 64,
