@@ -10,13 +10,14 @@ cassian.plot_model()
 cassian.train_on_dataset()
 
 ## -------------------------------------------------------------------------------------
-#from cassian.convenience import de_serialize
-#from matplotlib import style
+#from cassian.connectivity import DatabaseClient
+#from cassian.data_management import Dataset
 #
-#results     = de_serialize('results/store-103_results.pkl')
-#summary     = results['summary']
-#predictions = results['predictions']
+#store_id = 443
 #
-#def plot_predictions( sku) :
-#    style.use('ggplot')
-#    return predictions[sku].plot()
+#client = DatabaseClient( store_id = store_id)
+##client.fetch_data( intro_year_limit = 2016, min_num_of_records = 180)
+#
+#dataset = Dataset( raw_data_file = client.output_file)
+##preselected_skus = dataset.preselected_skus
+#dataset.save()
