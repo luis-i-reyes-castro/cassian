@@ -66,9 +66,12 @@ class Dataset :
         categories     = []
         num_categories = 0
 
-        def __init__( self, max_val = 12) :
+        def __init__( self, max_val = 12, min_val_is_one = False) :
 
             self.bins = [ -1, 0, 1, 2, 3, 4, 5, 6, 8, 10, 12 ]
+
+            if min_val_is_one :
+                self.bins = self.bins[1:]
 
             increment_steps = 4
             increment_value = 12
@@ -146,8 +149,6 @@ class Dataset :
         self.list_of_skus = self.info_main.index.tolist()
 
         self.vectors = pd.get_dummies( self.info_main)
-        
-        self.vectors= pd.concat([self.vectors, self.info_replenish['UNITS_PER_REP']], axis=1)
 
         self.categorizer = {}
 
@@ -430,6 +431,19 @@ class Dataset :
         self.info_other     = df[ other_cols ]
 
         # -----------------------------------------------------------------------------
+        self.categorizer['UNITS_PER_REP'] = \
+        self.TimeseriesCategorizer( self.info_replenish['UNITS_PER_REP'].max(),
+                                    min_val_is_one = True )
+
+        units_per_rep_array = self.info_replenish[ ['UNITS_PER_REP'] ].as_matrix()
+
+        self.info_main['UNITS_PER_REP'] = \
+        self.categorizer['UNITS_PER_REP'].categorize( units_per_rep_array )
+
+        self.info_main['UNITS_PER_REP'] = \
+        self.info_main['UNITS_PER_REP'].astype( 'category' )
+
+        # -----------------------------------------------------------------------------
         description_cols = [ column + '_NAME' for column in section_cols ]
         description_cols.append( 'DESCRIPTION' )
 
@@ -521,20 +535,20 @@ class Dataset :
 
         self.num_timesteps = 0
         self.list_of_sku_probs = [ 0.0 for sku in self.list_of_skus ]
-        
+
         for sku in self.list_of_skus :
             self.num_timesteps += self.data[sku].num_timesteps
-            
+
         if prob_func == 'timesteps':
 
             for ( i, sku) in enumerate( self.list_of_skus ) :
                 self.list_of_sku_probs[i] = \
                 float( self.data[sku].num_timesteps) / self.num_timesteps
-                
+
         if prob_func == 'utility':
-            
+
             expected_utlity_sku=[]
-            
+
             for sku in self.list_of_skus :
                 frequency=self.data[sku].timeseries['SOLD'].value_counts()
                 frequency_df=pd.Series.to_frame(frequency)
@@ -542,11 +556,11 @@ class Dataset :
                 frequency_df['Probability']=frequency_df[0]/total
                 frequency_df['Expected_p']=frequency_df['Probability']*frequency_df.index
                 expected_utlity_sku.append(sum(frequency_df['Expected_p']))
-                
+
             for ( i, sku) in enumerate( self.list_of_skus ) :
                 self.list_of_sku_probs[i] = \
                 float( self.info_replenish.loc[sku,'UNIT_UTILITY']) * expected_utlity_sku[i]
-        
+
         return
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
