@@ -22,7 +22,7 @@ from .convenience import get_date_today, move_date
 class Dataset :
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-    OUTPUT_DIR  = '/home/luis/cassian/dataset-[STORE-ID]/'
+    OUTPUT_DIR  = 'dataset-[STORE-ID]/'
     OUTPUT_FILE = 'ready-dataset.pkl'
 
     store_id         = 0
@@ -213,6 +213,12 @@ class Dataset :
 
         self.compute_mean_std()
         self.normalize_timeseries()
+
+        self.output_directory = \
+        self.OUTPUT_DIR.replace( '[STORE-ID]', str(self.store_id))
+        ensure_directory( self.output_directory)
+
+        self.output_file = self.output_directory + self.OUTPUT_FILE
 
         return
 
@@ -511,13 +517,8 @@ class Dataset :
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     def save( self) :
 
-        output_directory = self.OUTPUT_DIR.replace( '[STORE-ID]', str(self.store_id))
-        ensure_directory( output_directory)
-
-        output_file = output_directory + self.OUTPUT_FILE
-
-        print( 'Saving data to file:', output_file)
-        serialize( self, output_file)
+        print( 'Saving data to file:', self.output_file)
+        serialize( self, self.output_file)
 
         return
 
