@@ -10,7 +10,7 @@ def show_usage() :
     print( '(+) Print a list of stores:' )
     print( '    ./Cassian.py -l|--list' )
     print( '(+) Fetch data for training or prediction:' )
-    print( '    ./Cassian.py -s|--store <store_id> -f|--fetch [-r|--resume_fetch]' )
+    print( '    ./Cassian.py -s|--store <store_id> -f|--fetch [--build_dataset_only]' )
     print( '(+) Train a new model or load and re-train a saved one:' )
     print( '    ./Cassian.py -s|--store <store_id> -T|--train [-l|--load] ' +
            '[-e|--epochs] <num_of_epochs> ' +
@@ -25,9 +25,9 @@ def show_usage() :
 
 def main( argv) :
 
-    opts_short = 'hls:frlTe:b:t:w:Pp:'
+    opts_short = 'hls:fTle:b:t:w:Pp:'
     opts_long  = [ 'help', 'list', 'store=',
-                   'fetch', 'resume_fetch', 'load', 'train',
+                   'fetch', 'build_dataset_only', 'train', 'load',
                    'epochs=', 'batch_size=', 'timesteps=', 'workers=',
                    'predict', 'plot=' ]
 
@@ -45,7 +45,7 @@ def main( argv) :
 
     store_id     = 0
     mode_fetch   = False
-    resume       = False
+    build_only   = False
     mode_load    = False
     mode_train   = False
     epochs       = 1
@@ -77,8 +77,8 @@ def main( argv) :
         if opt in ( '-f', '--fetch') :
             mode_fetch = True
 
-        if opt in ( '-r', '--resume_fetch') :
-            resume = True
+        if opt in ( '--build_dataset_only') :
+            build_only = True
 
         if opt in ( '-l', '--load') :
             mode_load = True
@@ -118,8 +118,9 @@ def main( argv) :
         from cassian.data_management import Dataset
 
         client = DatabaseClient( store_id = store_id)
-        client.fetch_data( intro_year_limit = 2016,
-                           reuse_downloaded_result_sets = resume)
+
+        if not build_only :
+            client.fetch_data( intro_year_limit = 2016)
 
         dataset = Dataset( raw_data_file = client.output_file,
                            min_num_of_records = 180)
