@@ -32,7 +32,6 @@ def main( argv) :
                    'predict', 'plot=' ]
 
     model_file   = 'trained-models/store-[STORE-ID]_model.pkl'
-    dataset_file = 'dataset-[STORE-ID]/ready-dataset.pkl'
     results_file = 'results/store-[STORE-ID]_results.pkl'
 
     try :
@@ -128,14 +127,16 @@ def main( argv) :
 
     if mode_train :
 
+        from cassian.data_management import Dataset
         from cassian.models import CassianModel
 
         if mode_load :
             model_file = model_file.replace( '[STORE-ID]', str(store_id))
             cassian    = CassianModel.load( model_file)
         else :
-            dataset = dataset_file.replace( '[STORE-ID]', str(store_id))
-            cassian = CassianModel( dataset, batch_size, timesteps)
+            dataset_file = Dataset.OUTPUT_DIR + Dataset.OUTPUT_FILE
+            dataset      = dataset_file.replace( '[STORE-ID]', str(store_id))
+            cassian      = CassianModel( dataset, batch_size, timesteps)
 
         cassian.train_on_dataset( epochs = epochs, workers = workers)
 
