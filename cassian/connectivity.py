@@ -13,8 +13,8 @@ from .convenience import save_df_to_excel
 class DatabaseClient :
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-    SQL_SCRIPT  = '/home/luis/cassian/cassian/sql_scripts/tia-netezza_phase-[PHASE].sql'
-    OUTPUT_DIR  = '/home/luis/cassian/dataset-[STORE-ID]/'
+    SQL_SCRIPT  = 'cassian/sql_scripts/tia-netezza_phase-[PHASE].sql'
+    OUTPUT_DIR  = 'dataset-[STORE-ID]/'
     OUTPUT_FILE = 'raw-data.pkl'
 
     sku_timeseries       = None
