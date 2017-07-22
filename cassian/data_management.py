@@ -108,7 +108,7 @@ class Dataset :
             return cp.deepcopy(self)
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-    def __init__( self, raw_data_file, min_num_of_records = 180, prob_func='timesteps') :
+    def __init__( self, raw_data_file, min_num_of_records = 180) :
 
         if not exists_file( raw_data_file) :
             raise ValueError( 'Did not find file:', str(raw_data_file))
@@ -200,7 +200,7 @@ class Dataset :
             self.data[sku].z_missing_dim = \
             self.categorizer['Z5'].num_categories
 
-        self.update_num_timesteps_and_list_of_sku_probs(prob_func)
+        self.update_num_timesteps_and_list_of_sku_probs( 'timesteps' )
 
         arbitrary_sku_obj      = self.data[ self.list_of_skus[0] ]
         self.vec_dim           = arbitrary_sku_obj.vec_dim
@@ -386,31 +386,32 @@ class Dataset :
         rows__ = df['UNITS_PER_REP'] == 0
         df.loc[ rows__, 'UNITS_PER_REP'] = 1
 
-        df['STOCK_LIMIT'] = 0
+        df['STOCK_LIMIT']  = 0
         df['UNIT_UTILITY'] = 0
-        df['UNIT_COST'] = 0
+        df['UNIT_COST']    = 0
+        sku_ts_cols_drop   = [ 'STOCK_LIMIT', 'UNIT_UTILITY', 'UNIT_COST' ]
 
-        for ( index, _) in df.iterrows() :
+        for sku in df.index :
 
-            df.loc[ index, 'STOCK_LIMIT'] = \
-            self.sku_timeseries[ index][ 'STOCK_LIMIT'].max()
-            del self.sku_timeseries[ index][ 'STOCK_LIMIT']
+            df.loc[ sku, 'STOCK_LIMIT'] = \
+            self.sku_timeseries[ sku][ 'STOCK_LIMIT'].max()
+            df.loc[ sku, 'UNIT_UTILITY'] = \
+            self.sku_timeseries[ sku][ 'UNIT_UTILITY'].mean()
+            df.loc[ sku, 'UNIT_COST'] = \
+            self.sku_timeseries[ sku][ 'UNIT_COST'].mean()
 
-            df.loc[ index, 'UNIT_UTILITY'] = \
-            self.sku_timeseries[ index][ 'UNIT_UTILITY'].mean()
-            del self.sku_timeseries[ index][ 'UNIT_UTILITY']
-
-            df.loc[ index, 'UNIT_COST'] = \
-            self.sku_timeseries[ index][ 'UNIT_COST'].mean()
-            del self.sku_timeseries[ index][ 'UNIT_COST']
+            self.sku_timeseries[ sku].drop( sku_ts_cols_drop, axis = 1, inplace = True)
 
         rows__ = df['STOCK_LIMIT'] < 4 * df['UNITS_PER_REP']
         df.loc[ rows__, 'STOCK_LIMIT'] = 4 * df.loc[ rows__, 'UNITS_PER_REP']
 
+        rows__ = df['UNIT_UTILITY'] < df['UNIT_COST'] + 0.05
+        df.loc[ rows__, 'UNIT_UTILITY'] = df['UNIT_COST'] + 0.05
+
         # -----------------------------------------------------------------------------
         other_cols = [ 'SOLD_AVG', 'SOLD_STD', 'SOLD_MAX',
-                       'REPLENISHED_MAX', 'RETURNED_MAX',
-                       'TRASHED_MAX', 'FOUND_MAX', 'MISSING_MAX' ]
+                       'REPLENISHED_MAX', 'RETURNED_MAX', 'TRASHED_MAX',
+                       'FOUND_MAX', 'MISSING_MAX', 'DAILY_NET_UTILITY' ]
 
         for col_name in other_cols :
 
@@ -427,9 +428,13 @@ class Dataset :
                 function = pd.Series.min
 
             df[ col_name] = 0
-            for ( index, _) in df.iterrows() :
-                df.loc[ index, col_name] = \
-                function( self.sku_timeseries[ index][ col_name[:-4] ] )
+
+            for sku in df.index :
+                df.loc[ sku, col_name] = \
+                function( self.sku_timeseries[ sku][ col_name[:-4] ] )
+
+        df['DAILY_NET_UTILITY'] = ( df['UNIT_UTILITY'] - df['UNIT_COST'] ) \
+                                * df['SOLD_AVG']
 
         # -----------------------------------------------------------------------------
         self.info_main      = df[ section_cols + binary_cols ]
@@ -510,11 +515,6 @@ class Dataset :
         return self.data[sku]
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-    def as_dictionary( self) :
-
-        return self.__dict__
-
-    # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     def save( self) :
 
         print( 'Saving data to file:', self.output_file)
@@ -532,7 +532,7 @@ class Dataset :
         return de_serialize( dataset_filename)
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-    def update_num_timesteps_and_list_of_sku_probs( self,prob_func='timesteps') :
+    def update_num_timesteps_and_list_of_sku_probs( self, prob_func = 'timesteps') :
 
         self.num_timesteps = 0
         self.list_of_sku_probs = [ 0.0 for sku in self.list_of_skus ]
@@ -546,7 +546,7 @@ class Dataset :
                 self.list_of_sku_probs[i] = \
                 float( self.data[sku].num_timesteps) / self.num_timesteps
 
-        if prob_func == 'utility':
+        elif prob_func == 'utility':
 
             expected_utlity_sku=[]
 
