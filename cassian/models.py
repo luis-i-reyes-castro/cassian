@@ -39,8 +39,8 @@ class CassianModel :
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     def __init__( self, dataset_filename, batch_size, timesteps,
-                        vector_embedding_dim = 64,
-                        layer_sizes = [ 256, 256, 256] ) :
+                        dim_reduction_layer_sizes = [ 128, 64, 32, 16],
+                        VDGRNN_layer_sizes = [ 512, 256, 128] ) :
 
         print( 'Current task: Loading Dataset instance' )
         if not exists_file( dataset_filename) :
@@ -55,10 +55,11 @@ class CassianModel :
         self.timesteps       = timesteps
         self.steps_per_epoch = self.dataset.num_timesteps // ( batch_size * timesteps )
 
-        self.vector_embedding_dim = vector_embedding_dim
-        self.layer_sizes          = layer_sizes
-        self.outputs_list         = []
-        self.loss_functions       = {}
+        self.dim_reduction_layer_sizes = dim_reduction_layer_sizes
+        self.VDGRNN_layer_sizes        = VDGRNN_layer_sizes
+
+        self.outputs_list   = []
+        self.loss_functions = {}
 
         # -----------------------------------------------------------------------------
         # Builds the input layers and the dimensionality reduction layer
@@ -66,22 +67,28 @@ class CassianModel :
         self.X_vecs_shape = ( batch_size, self.dataset.vec_dim)
         self.X_ts_shape   = ( batch_size, None, self.dataset.ts_dim)
 
-        self.X_vecs       = Input( batch_shape = self.X_vecs_shape,
-                                   name = 'Product_Vectors')
-        self.X_ts         = Input( batch_shape = self.X_ts_shape,
-                                   name = 'Product_TS')
+        X_vecs = Input( batch_shape = self.X_vecs_shape, name = 'Product_Vectors')
+        X_ts   = Input( batch_shape = self.X_ts_shape, name = 'Product_TS')
 
-        layer_name = 'Dim_Reduction'
-        self.embedding = Dense( units = self.vector_embedding_dim,
-                                activation = 'softsign',
-                                name = layer_name )( self.X_vecs)
+        # -----------------------------------------------------------------------------
+        # Builds a stack of several layers of dimensionality reduction
+
+        last_output_vector = X_vecs
+
+        for ( i, layer_size) in enumerate( self.dim_reduction_layer_sizes) :
+
+            layer_name = 'Dim_Reduction-' + str(i+1)
+            last_output_vector = Dense( units = layer_size,
+                                        activation = 'softsign',
+                                        name = layer_name )( last_output_vector)
+            # shape = ( batch_size, None, dim_reduction_layer_dim)
 
         # -----------------------------------------------------------------------------
         # Builds a stack of several layers of Vector-dependent gated RNNs
 
-        self.last_outout = self.X_ts
+        last_output_ts = X_ts
 
-        for ( i, layer_size) in enumerate( self.layer_sizes) :
+        for ( i, layer_size) in enumerate( self.VDGRNN_layer_sizes) :
 
             layer_name = 'VDGRNN-'+ str(i+1)
             layer = VectorDependentGatedRNN( units = layer_size,
@@ -90,9 +97,7 @@ class CassianModel :
                                              architecture = 'single-gate',
                                              name = layer_name)
 
-            input_vectors = self.embedding
-            # shape = ( batch_size, embedding_dim)
-            self.last_outout = layer( [ input_vectors, self.last_outout] )
+            last_output_ts = layer( [ last_output_vector, last_output_ts] )
             # shape = ( batch_size, None, layer_dim)
 
         # -----------------------------------------------------------------------------
@@ -101,23 +106,25 @@ class CassianModel :
         # (a strictly positive real number) and is trained with Poisson loss
         # The second output is binary and is trained with binary cross-entropy
 
-        layer_names = [ 'Sold', 'Is_On_Sale' ]
+        dense_layer_names = [ 'Out-1', 'Out-2']
+        layer_names       = [ 'Sold', 'Is_On_Sale' ]
 
         def zero_one_softsign( tensor) :
             return 0.5 + 0.5 * K.softsign( 2.0 * tensor )
 
         layer_activations = [ K.exp, zero_one_softsign ]
-        layer_losses = [ 'poisson', 'binary_crossentropy' ]
+        layer_losses      = [ 'poisson', 'binary_crossentropy' ]
 
-        for ( layer_name, layer_activation, layer_loss) in \
-            zip( layer_names, layer_activations, layer_losses) :
+        for ( dense_layer_name, layer_name, layer_activation, layer_loss) in \
+            zip( dense_layer_names, layer_names, layer_activations, layer_losses) :
 
-            dense_layer = Dense( input_dim = self.layer_sizes[-1],
+            dense_layer = Dense( name = dense_layer_name,
+                                 input_dim = self.VDGRNN_layer_sizes[-1],
                                  units = 1,
                                  activation = layer_activation)
 
             output_tensor = \
-            TimeDistributed( dense_layer, name = layer_name)( self.last_outout )
+            TimeDistributed( dense_layer, name = layer_name)( last_output_ts )
 
             self.outputs_list.append( output_tensor)
             self.loss_functions[layer_name] = layer_loss
@@ -127,6 +134,7 @@ class CassianModel :
         # probability softmax (i.e. a softmax) trained with
         # sparse categorical cross-entropy
 
+        dense_layer_names = [ 'Out-' + str(i+3) for i in range(5)  ]
         layer_names = [ 'Replenished', 'Returned', 'Trashed', 'Found', 'Missing' ]
         layer_dims  = [ self.dataset.z_replenished_dim,
                         self.dataset.z_returned_dim,
@@ -135,20 +143,22 @@ class CassianModel :
                         self.dataset.z_missing_dim ]
         layer_losses = 'sparse_categorical_crossentropy'
 
-        for ( layer_name, layer_dim) in zip( layer_names, layer_dims) :
+        for ( dense_layer_name, layer_name, layer_dim) in \
+            zip( dense_layer_names, layer_names, layer_dims) :
 
-            dense_layer = Dense( input_dim = self.layer_sizes[-1],
+            dense_layer = Dense( name = dense_layer_name,
+                                 input_dim = self.VDGRNN_layer_sizes[-1],
                                  units = layer_dim,
                                  activation = 'softmax')
 
             output_tensor = \
-            TimeDistributed( dense_layer, name = layer_name)( self.last_outout )
+            TimeDistributed( dense_layer, name = layer_name)( last_output_ts )
 
             self.outputs_list.append( output_tensor)
             self.loss_functions[layer_name] = layer_losses
 
         # -----------------------------------------------------------------------------
-        self.model = Model( inputs = [ self.X_vecs, self.X_ts],
+        self.model = Model( inputs = [ X_vecs, X_ts],
                             outputs = self.outputs_list )
         self.compile_model()
 
@@ -177,12 +187,12 @@ class CassianModel :
     def save_model( self) :
 
         output_dict = {}
-        output_dict['dataset_filename']     = self.dataset_filename
-        output_dict['batch_size']           = self.batch_size
-        output_dict['timesteps']            = self.timesteps
-        output_dict['vector_embedding_dim'] = self.vector_embedding_dim
-        output_dict['layer_sizes']          = self.layer_sizes
-        output_dict['weights_filename']     = self.weights_file
+        output_dict['dataset_filename']          = self.dataset_filename
+        output_dict['batch_size']                = self.batch_size
+        output_dict['timesteps']                 = self.timesteps
+        output_dict['dim_reduction_layer_sizes'] = self.dim_reduction_layer_sizes
+        output_dict['VDGRNN_layer_sizes']        = self.VDGRNN_layer_sizes
+        output_dict['weights_filename']          = self.weights_file
 
         print( 'Saving CassianModel instance to file:', self.output_file)
         serialize( output_dict, self.output_file)
@@ -210,8 +220,8 @@ class CassianModel :
         cassian = CassianModel( input_dict['dataset_filename'],
                                 input_dict['batch_size'],
                                 input_dict['timesteps'],
-                                input_dict['vector_embedding_dim'],
-                                input_dict['layer_sizes'] )
+                                input_dict['dim_reduction_layer_sizes'],
+                                input_dict['VDGRNN_layer_sizes'] )
 
         cassian.model.load_weights( input_dict['weights_filename'] )
 
