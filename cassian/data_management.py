@@ -52,7 +52,7 @@ class Dataset :
     z_trashed_dim     = 0
     z_found_dim       = 0
     z_missing_dim     = 0
-    list_of_sku_probs = ()
+    list_of_sku_probs = []
 
     vec_mean = np.array([])
     vec_std  = np.array([])
@@ -200,7 +200,7 @@ class Dataset :
             self.data[sku].z_missing_dim = \
             self.categorizer['Z5'].num_categories
 
-        self.update_num_timesteps_and_list_of_sku_probs( 'timesteps' )
+        self.update_num_timesteps_and_list_of_sku_probs( 'daily-net-utility' )
 
         arbitrary_sku_obj      = self.data[ self.list_of_skus[0] ]
         self.vec_dim           = arbitrary_sku_obj.vec_dim
@@ -411,7 +411,7 @@ class Dataset :
         # -----------------------------------------------------------------------------
         other_cols = [ 'SOLD_AVG', 'SOLD_STD', 'SOLD_MAX',
                        'REPLENISHED_MAX', 'RETURNED_MAX', 'TRASHED_MAX',
-                       'FOUND_MAX', 'MISSING_MAX', 'DAILY_NET_UTILITY' ]
+                       'FOUND_MAX', 'MISSING_MAX' ]
 
         for col_name in other_cols :
 
@@ -433,26 +433,22 @@ class Dataset :
                 df.loc[ sku, col_name] = \
                 function( self.sku_timeseries[ sku][ col_name[:-4] ] )
 
-        df['DAILY_NET_UTILITY'] = ( df['UNIT_UTILITY'] - df['UNIT_COST'] ) \
-                                * df['SOLD_AVG']
-
-        # -----------------------------------------------------------------------------
-        self.info_main      = df[ section_cols + binary_cols ]
-        self.info_replenish = df[ replenish_cols ]
-        self.info_other     = df[ other_cols ]
-
         # -----------------------------------------------------------------------------
         self.categorizer['UNITS_PER_REP'] = \
-        self.TimeseriesCategorizer( self.info_replenish['UNITS_PER_REP'].max(),
-                                    min_val_is_one = True )
+        self.TimeseriesCategorizer( df['UNITS_PER_REP'].max(), min_val_is_one = True)
 
-        units_per_rep_array = self.info_replenish[ ['UNITS_PER_REP'] ].as_matrix()
-
-        self.info_main['UNITS_PER_REP'] = \
+        units_per_rep_array = df[ ['UNITS_PER_REP'] ].as_matrix()
+        df['UNITS_PER_REP'] = \
         self.categorizer['UNITS_PER_REP'].categorize( units_per_rep_array )
+        df['UNITS_PER_REP'] = df['UNITS_PER_REP'].astype( 'category' )
 
-        self.info_main['UNITS_PER_REP'] = \
-        self.info_main['UNITS_PER_REP'].astype( 'category' )
+        df['DAILY_NET_UTILITY'] = \
+        ( df['UNIT_UTILITY'] - df['UNIT_COST'] ) * df['SOLD_AVG']
+
+        # -----------------------------------------------------------------------------
+        self.info_main      = df[ section_cols + binary_cols + ['UNITS_PER_REP'] ]
+        self.info_replenish = df[ replenish_cols + ['DAILY_NET_UTILITY'] ]
+        self.info_other     = df[ other_cols ]
 
         # -----------------------------------------------------------------------------
         description_cols = [ column + '_NAME' for column in section_cols ]
@@ -535,24 +531,24 @@ class Dataset :
     def update_num_timesteps_and_list_of_sku_probs( self, prob_func = 'timesteps') :
 
         self.num_timesteps = 0
-        self.list_of_sku_probs = ( 0.0 for sku in self.list_of_skus )
+        self.list_of_sku_probs = [ 0.0 for sku in self.list_of_skus ]
 
         for sku in self.list_of_skus :
             self.num_timesteps += self.data[sku].num_timesteps
 
-        if prob_func == 'timesteps':
+        if prob_func == 'timesteps' :
 
             for ( i, sku) in enumerate( self.list_of_skus ) :
                 self.list_of_sku_probs[i] = \
                 float( self.data[sku].num_timesteps) / self.num_timesteps
 
-        elif prob_func == 'utility':
+        elif prob_func == 'daily-net-utility' :
 
-            total_DNU = self.info_other['DAILY_NET_UTILITY'].sum()
+            total_DNU = self.info_replenish['DAILY_NET_UTILITY'].sum()
 
             for ( i, sku) in enumerate( self.list_of_skus ) :
                 self.list_of_sku_probs[i] = \
-                float( self.info_other.loc[ sku, 'DAILY_NET_UTILITY'] ) / total_DNU
+                float( self.info_replenish.loc[ sku, 'DAILY_NET_UTILITY'] ) / total_DNU
 
         return
 
