@@ -52,7 +52,7 @@ class Dataset :
     z_trashed_dim     = 0
     z_found_dim       = 0
     z_missing_dim     = 0
-    list_of_sku_probs = []
+    list_of_sku_probs = ()
 
     vec_mean = np.array([])
     vec_std  = np.array([])
@@ -535,7 +535,7 @@ class Dataset :
     def update_num_timesteps_and_list_of_sku_probs( self, prob_func = 'timesteps') :
 
         self.num_timesteps = 0
-        self.list_of_sku_probs = [ 0.0 for sku in self.list_of_skus ]
+        self.list_of_sku_probs = ( 0.0 for sku in self.list_of_skus )
 
         for sku in self.list_of_skus :
             self.num_timesteps += self.data[sku].num_timesteps
@@ -548,19 +548,11 @@ class Dataset :
 
         elif prob_func == 'utility':
 
-            expected_utlity_sku=[]
-
-            for sku in self.list_of_skus :
-                frequency=self.data[sku].timeseries['SOLD'].value_counts()
-                frequency_df=pd.Series.to_frame(frequency)
-                total=sum(frequency)
-                frequency_df['Probability']=frequency_df[0]/total
-                frequency_df['Expected_p']=frequency_df['Probability']*frequency_df.index
-                expected_utlity_sku.append(sum(frequency_df['Expected_p']))
+            total_DNU = self.info_other['DAILY_NET_UTILITY'].sum()
 
             for ( i, sku) in enumerate( self.list_of_skus ) :
                 self.list_of_sku_probs[i] = \
-                float( self.info_replenish.loc[sku,'UNIT_UTILITY']) * expected_utlity_sku[i]
+                float( self.info_other.loc[ sku, 'DAILY_NET_UTILITY'] ) / total_DNU
 
         return
 
