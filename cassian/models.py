@@ -40,7 +40,7 @@ class CassianModel :
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     def __init__( self, dataset_filename, batch_size, timesteps,
                         dim_reduction_layer_sizes = [ 128, 64, 32, 16],
-                        VDGRNN_layer_sizes = [ 512, 256, 128] ) :
+                        VDGRNN_layer_sizes = [ 256, 256, 128, 128] ) :
 
         print( 'Current task: Loading Dataset instance' )
         if not exists_file( dataset_filename) :
