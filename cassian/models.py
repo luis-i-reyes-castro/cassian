@@ -39,8 +39,8 @@ class CassianModel :
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     def __init__( self, dataset_filename, batch_size, timesteps,
-                        dim_reduction_layer_sizes = [ 1024, 512, 256, 16],
-                        VDGRNN_layer_sizes = [ 256 ] ) :
+                        dim_reduction_layer_sizes = [ 512, 512, 256, 256, 32],
+                        VDGRNN_layer_sizes = [ 256, 256, 128, 128] ) :
 
         print( 'Current task: Loading Dataset instance' )
         if not exists_file( dataset_filename) :
@@ -185,9 +185,9 @@ class CassianModel :
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     def compile_model( self) :
 
-        self.optimizer = optimizers.Adam( lr = 2e-5,
+        self.optimizer = optimizers.Adam( lr = 0.001,
                                           beta_1 = 0.9,
-                                          beta_2 = 0.99 )
+                                          beta_2 = 0.995 )
 
         self.model.compile( optimizer = self.optimizer,
                             loss = self.loss_functions,
@@ -292,26 +292,24 @@ class CassianModel :
                                        save_weights_only = True,
                                        save_best_only = True),
                       EarlyStopping( monitor = 'val_loss',
-                                     patience = 10, mode = 'min'),
+                                     patience = 20, mode = 'min'),
                       EarlyStopping( monitor = 'val_Sold_mean_absolute_error',
-                                     patience = 10, mode = 'min'),
+                                     patience = 20, mode = 'min'),
                       TensorBoard( log_dir = './tensorboard-logs/',
-                                   histogram_freq = 1,
-                                   write_graph = True,
-                                   write_images= True) ]
+                                   write_graph = False) ]
 
         self.save_model()
 
         ( dataset_train, dataset_valid) = self.dataset.split(0.75)
 
-        visualization_factor = 20
+        visualization_factor = 10
         new_steps_per_epoch  = self.steps_per_epoch // visualization_factor
         new_epochs           = epochs * visualization_factor
 
         self.model.fit_generator( generator = batch_generator( dataset_train),
                                   validation_data = batch_generator( dataset_valid),
                                   steps_per_epoch = new_steps_per_epoch,
-                                  validation_steps = new_steps_per_epoch // 10,
+                                  validation_steps = new_steps_per_epoch,
                                   epochs = new_epochs,
                                   workers = workers,
                                   callbacks = callbacks,
