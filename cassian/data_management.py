@@ -560,8 +560,8 @@ class Dataset :
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     def compute_mean_std( self) :
 
-        self.vec_mean += self.vectors.mean( axis = 0).as_matrix()
-        self.vec_std  += self.vectors.std( axis = 0).as_matrix()
+        self.vec_mean = self.vectors.mean( axis = 0).as_matrix()
+        self.vec_std  = self.vectors.std( axis = 0).as_matrix()
 
         self.ts_mean = np.zeros( shape = ( self.ts_dim, ), dtype = 'float32')
         self.ts_std  = np.zeros( shape = ( self.ts_dim, ), dtype = 'float32')
