@@ -15,7 +15,7 @@ from keras.layers import Input, Dense
 from keras.layers.wrappers import TimeDistributed
 from keras.models import Model
 from keras import optimizers
-from keras.callbacks import ModelCheckpoint, EarlyStopping
+from keras.callbacks import ModelCheckpoint, EarlyStopping, TensorBoard
 from keras.utils.vis_utils import plot_model
 
 from .data_management import Dataset
@@ -39,8 +39,8 @@ class CassianModel :
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     def __init__( self, dataset_filename, batch_size, timesteps,
-                        dim_reduction_layer_sizes = [ 128, 64, 32, 16],
-                        VDGRNN_layer_sizes = [ 256, 256, 128, 128] ) :
+                        dim_reduction_layer_sizes = [ 1024, 512, 256, 16],
+                        VDGRNN_layer_sizes = [ 256 ] ) :
 
         print( 'Current task: Loading Dataset instance' )
         if not exists_file( dataset_filename) :
@@ -158,6 +158,16 @@ class CassianModel :
             self.loss_functions[layer_name] = layer_losses
 
         # -----------------------------------------------------------------------------
+        self.valid_metrics                = {}
+        self.valid_metrics['Sold']        = 'mae'
+        self.valid_metrics['Is_On_Sale']  = 'accuracy'
+        self.valid_metrics['Replenished'] = 'categorical_accuracy'
+        self.valid_metrics['Returned']    = 'categorical_accuracy'
+        self.valid_metrics['Trashed']     = 'categorical_accuracy'
+        self.valid_metrics['Found']       = 'categorical_accuracy'
+        self.valid_metrics['Missing']     = 'categorical_accuracy'
+
+        # -----------------------------------------------------------------------------
         self.model = Model( inputs = [ X_vecs, X_ts],
                             outputs = self.outputs_list )
         self.compile_model()
@@ -175,11 +185,13 @@ class CassianModel :
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     def compile_model( self) :
 
-        self.optimizer = optimizers.Adam( lr = 2e-4,
+        self.optimizer = optimizers.Adam( lr = 2e-5,
                                           beta_1 = 0.9,
                                           beta_2 = 0.99 )
 
-        self.model.compile( optimizer = self.optimizer, loss = self.loss_functions)
+        self.model.compile( optimizer = self.optimizer,
+                            loss = self.loss_functions,
+                            metrics = self.valid_metrics)
 
         return
 
@@ -279,19 +291,28 @@ class CassianModel :
                                        monitor = 'loss', mode = 'min',
                                        save_weights_only = True,
                                        save_best_only = True),
-                      EarlyStopping( monitor = 'loss',
-                                     patience = 2, mode = 'min'),
-                      EarlyStopping( monitor = 'Replenished_loss',
-                                     patience = 2, mode = 'min') ]
+                      EarlyStopping( monitor = 'val_loss',
+                                     patience = 10, mode = 'min'),
+                      EarlyStopping( monitor = 'val_Sold_mean_absolute_error',
+                                     patience = 10, mode = 'min'),
+                      TensorBoard( log_dir = './tensorboard-logs/',
+                                   histogram_freq = 1,
+                                   write_graph = True,
+                                   write_images= True) ]
 
         self.save_model()
 
         ( dataset_train, dataset_valid) = self.dataset.split(0.75)
 
+        visualization_factor = 20
+        new_steps_per_epoch  = self.steps_per_epoch // visualization_factor
+        new_epochs           = epochs * visualization_factor
+
         self.model.fit_generator( generator = batch_generator( dataset_train),
                                   validation_data = batch_generator( dataset_valid),
-                                  steps_per_epoch = self.steps_per_epoch,
-                                  epochs = epochs,
+                                  steps_per_epoch = new_steps_per_epoch,
+                                  validation_steps = new_steps_per_epoch // 10,
+                                  epochs = new_epochs,
                                   workers = workers,
                                   callbacks = callbacks,
                                   pickle_safe = True )
