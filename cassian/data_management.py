@@ -9,7 +9,6 @@ All rights reserved.
 """
 
 # =====================================================================================
-import copy as cp
 import numpy as np
 import pandas as pd
 from datetime import datetime as dtdt
@@ -25,39 +24,39 @@ class Dataset :
     OUTPUT_DIR  = 'dataset-[STORE-ID]/'
     OUTPUT_FILE = 'ready-dataset.pkl'
 
-    store_id         = 0
-    info_main        = pd.DataFrame()
-    info_replenish   = pd.DataFrame()
-    info_other       = pd.DataFrame()
-    info_description = pd.DataFrame()
+    raw_data_file      = None # Must KEEP when splitting
+    min_num_of_records = 0 # Must KEEP when splitting
 
-    num_skus     = 0
-    list_of_skus = []
+    store_id         = 0 # Must KEEP when splitting
+    info_main        = pd.DataFrame() # Must update when splitting
+    info_replenish   = pd.DataFrame() # Must update when splitting
+    info_other       = pd.DataFrame() # Must update when splitting
+    info_description = pd.DataFrame() # Must update when splitting
 
-    cat_replenished = None
-    cat_returned    = None
-    cat_trashed     = None
-    cat_found       = None
-    cat_missing     = None
+    num_skus     = 0  # Must update when splitting
+    list_of_skus = [] # Must update when splitting
+    vectors      = pd.DataFrame() # Must update when splitting
+    categorizer  = {} # Must KEEP when splitting
+    data         = {} # Must update when splitting
 
-    vectors     = pd.DataFrame()
-    categorizer = {}
-    data        = {}
+    num_timesteps     = 0 # Must update when splitting
+    list_of_sku_probs = [] # Must update when splitting
 
-    num_timesteps     = 0
-    vec_dim           = 0
-    ts_dim            = 0
-    z_replenished_dim = 0
-    z_returned_dim    = 0
-    z_trashed_dim     = 0
-    z_found_dim       = 0
-    z_missing_dim     = 0
-    list_of_sku_probs = []
+    vec_dim           = 0 # Must KEEP when splitting
+    ts_dim            = 0 # Must KEEP when splitting
+    z_replenished_dim = 0 # Must KEEP when splitting
+    z_returned_dim    = 0 # Must KEEP when splitting
+    z_trashed_dim     = 0 # Must KEEP when splitting
+    z_found_dim       = 0 # Must KEEP when splitting
+    z_missing_dim     = 0 # Must KEEP when splitting
 
-    vec_mean = np.array([])
-    vec_std  = np.array([])
-    ts_mean  = np.array([])
-    ts_std   = np.array([])
+    vec_mean = np.array([]) # Must update when splitting
+    vec_std  = np.array([]) # Must update when splitting
+    ts_mean  = np.array([]) # Must update when splitting
+    ts_std   = np.array([]) # Must update when splitting
+
+    output_directory = None # Must KEEP(?) when splitting
+    output_file      = None # Must update when splitting
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     class TimeseriesCategorizer :
@@ -103,18 +102,19 @@ class Dataset :
 
             return self.categories[index]
 
-        def get_copy( self) :
-
-            return cp.deepcopy(self)
-
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-    def __init__( self, raw_data_file, min_num_of_records = 180) :
+    def __init__( self, raw_data_file = None, min_num_of_records = 180) :
 
-        if not exists_file( raw_data_file) :
+        if raw_data_file is None:
+            return
+        elif not exists_file( raw_data_file) :
             raise ValueError( 'Did not find file:', str(raw_data_file))
 
+        self.raw_data_file      = raw_data_file
+        self.min_num_of_records = min_num_of_records
+
         print( 'Current task: Building dataset object' )
-        raw_data = de_serialize( raw_data_file)
+        raw_data = de_serialize( self.raw_data_file)
 
         self.store_id    = raw_data['store-id']
         big_df           = raw_data['timeseries']
@@ -123,27 +123,30 @@ class Dataset :
         print( 'Current task: Selecting SKUs with sufficient timeseries data ' +
                'and processing the timeseries' )
 
-        self.sku_timeseries = {}
-        skus_to_drop = []
+        sku_information_df = raw_data['sku-info']
+        sku_timeseries     = {}
+        skus_to_drop       = []
 
         for sku in preselected_skus :
 
             sku_df = big_df[ big_df['SKU_A'] == sku ]
             sku_df = self.process_sku_timeseries( sku_df)
 
-            if len( sku_df ) >= min_num_of_records + 1 :
-                self.sku_timeseries[ sku] = sku_df
+            if len( sku_df ) >= self.min_num_of_records + 1 :
+                sku_timeseries[ sku] = sku_df
             else :
                 skus_to_drop.append(sku)
 
-        # serialize( self.sku_timeseries, 'sku_timeseries.pkl')
+        # serialize( sku_timeseries, 'sku_timeseries.pkl')
         # serialize( skus_to_drop, 'skus_to_drop.pkl')
 
-        # self.sku_timeseries = de_serialize( 'sku_timeseries.pkl' )
+        # sku_timeseries = de_serialize( 'sku_timeseries.pkl' )
         # skus_to_drop = de_serialize( 'skus_to_drop.pkl' )
 
         print( 'Current task: Processing SKU static information' )
-        self.process_sku_information( raw_data['sku-info'], skus_to_drop)
+        self.process_sku_information( sku_information_df,
+                                      sku_timeseries,
+                                      skus_to_drop)
 
         self.num_skus     = len( self.info_main )
         self.list_of_skus = self.info_main.index.tolist()
@@ -173,7 +176,7 @@ class Dataset :
 
             print( 'Building SkuData object for SKU:', str(sku))
             self.data[sku] = SkuData( vector = self.vectors.loc[sku],
-                                      timeseries = self.sku_timeseries[ sku] )
+                                      timeseries = sku_timeseries[ sku] )
 
             self.data[sku].z_replenished = \
             self.categorizer['Z1'].categorize( self.data[sku].y_replenished )
@@ -357,7 +360,9 @@ class Dataset :
         return df
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-    def process_sku_information( self, sku_information_df, skus_to_drop) :
+    def process_sku_information( self, sku_information_df,
+                                       sku_timeseries,
+                                       skus_to_drop) :
 
         df = sku_information_df
         df.set_index( 'SKU_A', inplace = True)
@@ -394,13 +399,13 @@ class Dataset :
         for sku in df.index :
 
             df.loc[ sku, 'STOCK_LIMIT'] = \
-            self.sku_timeseries[ sku][ 'STOCK_LIMIT'].max()
+            sku_timeseries[ sku][ 'STOCK_LIMIT'].max()
             df.loc[ sku, 'UNIT_UTILITY'] = \
-            self.sku_timeseries[ sku][ 'UNIT_UTILITY'].mean()
+            sku_timeseries[ sku][ 'UNIT_UTILITY'].mean()
             df.loc[ sku, 'UNIT_COST'] = \
-            self.sku_timeseries[ sku][ 'UNIT_COST'].mean()
+            sku_timeseries[ sku][ 'UNIT_COST'].mean()
 
-            self.sku_timeseries[ sku].drop( sku_ts_cols_drop, axis = 1, inplace = True)
+            sku_timeseries[ sku].drop( sku_ts_cols_drop, axis = 1, inplace = True)
 
         rows__ = df['STOCK_LIMIT'] < 4 * df['UNITS_PER_REP']
         df.loc[ rows__, 'STOCK_LIMIT'] = 4 * df.loc[ rows__, 'UNITS_PER_REP']
@@ -431,7 +436,7 @@ class Dataset :
 
             for sku in df.index :
                 df.loc[ sku, col_name] = \
-                function( self.sku_timeseries[ sku][ col_name[:-4] ] )
+                function( sku_timeseries[ sku][ col_name[:-4] ] )
 
         # -----------------------------------------------------------------------------
         self.categorizer['UNITS_PER_REP'] = \
@@ -555,9 +560,6 @@ class Dataset :
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     def compute_mean_std( self) :
 
-        self.vec_mean = np.zeros( shape = ( self.vec_dim, ), dtype = 'float32')
-        self.vec_std  = np.zeros( shape = ( self.vec_dim, ), dtype = 'float32')
-
         self.vec_mean += self.vectors.mean( axis = 0).as_matrix()
         self.vec_std  += self.vectors.std( axis = 0).as_matrix()
 
@@ -587,50 +589,57 @@ class Dataset :
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     def split( self, train_fraction = 0.8):
 
-        list_of_skus_A, list_of_skus_B = \
+        skus_training, skus_validation = \
         train_test_split( self.list_of_skus, train_size = train_fraction)
 
-        lists_of_skus   = [ list_of_skus_A, list_of_skus_B]
-        dataset_objects = []
+        sku_groups = [ skus_training, skus_validation]
+        datasets   = []
 
-        for list_of_skus in lists_of_skus :
+        for sku_group in sku_groups :
 
-            ds_obj          = Dataset()
-            ds_obj.store_id = self.store_id
-            good_rows       = self.info_main.index.isin( list_of_skus)
+            ds_obj = Dataset()
+            ds_obj.raw_data_file      = self.raw_data_file
+            ds_obj.min_num_of_records = self.min_num_of_records
 
+            ds_obj.store_id         = self.store_id
+            good_rows               = self.info_main.index.isin(sku_group)
             ds_obj.info_main        = self.info_main.loc[ good_rows]
             ds_obj.info_replenish   = self.info_replenish.loc[ good_rows]
             ds_obj.info_other       = self.info_other.loc[ good_rows]
             ds_obj.info_description = self.info_description.loc[ good_rows]
-            ds_obj.num_skus         = len( list_of_skus)
-            ds_obj.list_of_skus     = list_of_skus.copy()
-            ds_obj.vectors          = self.vectors.loc[ good_rows]
 
-            ds_obj.categorizer = {}
-            for key in self.categorizer.keys() :
-                ds_obj.categorizer[key] = self.categorizer[key].get_copy()
+            ds_obj.num_skus         = len(sku_group)
+            ds_obj.list_of_skus     = ds_obj.info_main.index.tolist()
+            ds_obj.vectors          = self.vectors.loc[ good_rows]
+            ds_obj.categorizer      = self.categorizer.copy()
 
             ds_obj.data = {}
             for sku in ds_obj.list_of_skus :
-                ds_obj.data[sku] = self.data[sku].get_copy()
+                ds_obj.data[sku] = self.data[sku]
 
             ds_obj.update_num_timesteps_and_list_of_sku_probs()
 
-            ds_obj.vec_dim            = self.vec_dim
-            ds_obj.ts_dim             = self.ts_dim
+            ds_obj.vec_dim           = self.vec_dim
+            ds_obj.ts_dim            = self.ts_dim
             ds_obj.z_replenished_dim = self.z_replenished_dim
             ds_obj.z_returned_dim    = self.z_returned_dim
             ds_obj.z_trashed_dim     = self.z_trashed_dim
             ds_obj.z_found_dim       = self.z_found_dim
             ds_obj.z_missing_dim     = self.z_missing_dim
 
-            ds_obj.compute_mean_std()
-            ds_obj.normalize_timeseries()
+            datasets.append(ds_obj)
 
-            dataset_objects.append( ds_obj)
+        datasets[0].compute_mean_std()
 
-        return ( dataset_objects[0], dataset_objects[1])
+        datasets[1].vec_mean = datasets[0].vec_mean
+        datasets[1].vec_std  = datasets[0].vec_std
+        datasets[1].ts_mean  = datasets[0].ts_mean
+        datasets[1].ts_std   = datasets[0].ts_std
+
+        datasets[0].normalize_timeseries()
+        datasets[1].normalize_timeseries()
+
+        return ( datasets[0], datasets[1])
 
 # =====================================================================================
 class SkuData :
@@ -721,11 +730,6 @@ class SkuData :
             self.ts += ts_mean
 
         return
-
-    # =---=---=---=---=---=---=---=---=---=---=---=---=---=---=---=---=---=---=---=---=
-    def get_copy( self) :
-
-        return cp.deepcopy(self)
 
     # =---=---=---=---=---=---=---=---=---=---=---=---=---=---=---=---=---=---=---=---=
     def get_sample( self, timesteps, seed, batch_sample, sample_index) :
