@@ -2,6 +2,7 @@ __pycache__
 dataset-*
 layers.py
 results
+tensorboard-logs
 trained-models
 *.jpg
 *.xlsx

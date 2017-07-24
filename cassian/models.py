@@ -32,7 +32,7 @@ class CassianModel :
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     OUTPUT_DIR   = '/home/luis/cassian/trained-models/'
     OUTPUT_FILE  = 'store-[STORE-ID]_model.pkl'
-    WEIGHTS_FILE = 'store-[STORE-ID]_weights.{epoch:04d}-{val_loss:.4f}.h5'
+    WEIGHTS_FILE = 'store-[STORE-ID]_weights.h5'
     RESULTS_DIR  = '/home/luis/cassian/results/'
     RESULTS_FILE = 'store-[STORE-ID]_results.pkl'
     SUMMARY_FILE = 'store-[STORE-ID]_summary.xlsx'
@@ -185,7 +185,7 @@ class CassianModel :
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     def compile_model( self) :
 
-        self.optimizer = optimizers.Adam( lr = 0.001,
+        self.optimizer = optimizers.Adam( lr = 1e-4,
                                           beta_1 = 0.9,
                                           beta_2 = 0.995 )
 
