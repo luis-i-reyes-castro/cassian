@@ -238,36 +238,36 @@ class CassianModel :
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     def train_on_dataset( self, epochs = 1, workers = 4) :
 
-        def batch_generator() :
+        def batch_generator( dataset) :
 
             batch_specs            = BatchSpecifications()
             batch_specs.batch_size = self.batch_size
             batch_specs.timesteps  = self.timesteps
-            batch_specs.vec_dim    = self.dataset.vec_dim
-            batch_specs.ts_dim     = self.dataset.ts_dim
+            batch_specs.vec_dim    = dataset.vec_dim
+            batch_specs.ts_dim     = dataset.ts_dim
 
-            batch_specs.ts_replenished_dim = self.dataset.z_replenished_dim
-            batch_specs.ts_returned_dim    = self.dataset.z_returned_dim
-            batch_specs.ts_trashed_dim     = self.dataset.z_trashed_dim
-            batch_specs.ts_found_dim       = self.dataset.z_found_dim
-            batch_specs.ts_missing_dim     = self.dataset.z_missing_dim
+            batch_specs.ts_replenished_dim = dataset.z_replenished_dim
+            batch_specs.ts_returned_dim    = dataset.z_returned_dim
+            batch_specs.ts_trashed_dim     = dataset.z_trashed_dim
+            batch_specs.ts_found_dim       = dataset.z_found_dim
+            batch_specs.ts_missing_dim     = dataset.z_missing_dim
 
             batch_sample = BatchSample( batch_specs)
 
             while True :
 
-                batch_skus = np.random.choice( a = self.dataset.list_of_skus,
-                                               p = self.dataset.list_of_sku_probs,
+                batch_skus = np.random.choice( a = dataset.list_of_skus,
+                                               p = dataset.list_of_sku_probs,
                                                size = self.batch_size )
 
                 random_seeds = np.random.rand( self.batch_size)
 
                 for ( sample_i, sku) in enumerate( batch_skus ) :
 
-                    self.dataset(sku).get_sample( timesteps = self.timesteps,
-                                                  seed = random_seeds[sample_i],
-                                                  batch_sample = batch_sample,
-                                                  sample_index = sample_i)
+                    dataset(sku).get_sample( timesteps = self.timesteps,
+                                             seed = random_seeds[sample_i],
+                                             batch_sample = batch_sample,
+                                             sample_index = sample_i)
 
                 yield [ batch_sample.inputs, batch_sample.targets ]
 
@@ -285,7 +285,11 @@ class CassianModel :
                                      patience = 2, mode = 'min') ]
 
         self.save_model()
-        self.model.fit_generator( generator = batch_generator(),
+
+        ( dataset_train, dataset_valid) = self.dataset.split(0.75)
+
+        self.model.fit_generator( generator = batch_generator( dataset_train),
+                                  validation_data = batch_generator( dataset_valid),
                                   steps_per_epoch = self.steps_per_epoch,
                                   epochs = epochs,
                                   workers = workers,
