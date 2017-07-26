@@ -17,6 +17,7 @@ from keras.models import Model
 from keras import optimizers
 from keras.callbacks import ModelCheckpoint, EarlyStopping, TensorBoard
 from keras.utils.vis_utils import plot_model
+from time import time
 
 from .data_management import Dataset
 from .batching import BatchSpecifications, BatchSample
@@ -185,7 +186,7 @@ class CassianModel :
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     def compile_model( self) :
 
-        self.optimizer = optimizers.Adam( lr = 1e-4,
+        self.optimizer = optimizers.Adam( lr = 2e-5,
                                           beta_1 = 0.9,
                                           beta_2 = 0.995 )
 
@@ -285,8 +286,11 @@ class CassianModel :
 
             return
 
+        ( dataset_train, dataset_valid) = self.dataset.split(0.68)
+
         print( 'Current task: Training for ' + str(epochs) + ' epochs' )
 
+        tensorboard_logs = str('tensorboard-logs/{}').format(time())
         callbacks = [ ModelCheckpoint( self.weights_file,
                                        monitor = 'val_loss', mode = 'min',
                                        save_weights_only = True,
@@ -295,12 +299,10 @@ class CassianModel :
                                      patience = 20, mode = 'min'),
                       EarlyStopping( monitor = 'val_Sold_mean_absolute_error',
                                      patience = 20, mode = 'min'),
-                      TensorBoard( log_dir = './tensorboard-logs/',
+                      TensorBoard( log_dir = tensorboard_logs,
                                    write_graph = False) ]
 
         self.save_model()
-
-        ( dataset_train, dataset_valid) = self.dataset.split(0.75)
 
         visualization_factor = 10
         new_steps_per_epoch  = self.steps_per_epoch // visualization_factor
