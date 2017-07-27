@@ -40,7 +40,6 @@ class SingleGateHybridUnit ( Layer ) :
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     def __init__( self, units,
-                  learn_initial_state = True,
                   stateful = False,
                   return_sequences = False,
                   go_backwards = False,
@@ -48,27 +47,17 @@ class SingleGateHybridUnit ( Layer ) :
                   mat_W_0_initializer = 'glorot_uniform',
                   vec_b_0_initializer = 'zero',
                   mat_W_s_initializer = 'glorot_uniform',
-                  vec_b_s_mean        = +2.5,
+                  vec_b_s_mean        = +1.0,
                   mat_W_d_initializer = 'glorot_uniform',
                   mat_U_d_initializer = 'identity',
                   vec_b_d_initializer = 'zero',
                   mat_W_z_initializer = 'glorot_uniform',
                   mat_U_z_initializer = 'glorot_uniform',
-                  vec_b_z_mean        = -2.5,
+                  vec_b_z_mean        = -1.0,
                   activity_reg = None,
                   vector_dropout = 0.,
                   input_dropout = 0.,
                   state_dropout = 0., **kwargs) :
-
-        if learn_initial_state and stateful :
-            raise ValueError( 'Learning the initial state is not available ' +
-                              'in stateful mode. However, you may first learn ' +
-                              'an initial state in non-stateful mode, retrieve ' +
-                              'the layer\'s learned initial state using the ' +
-                              'get_initial_states method, copy the ' +
-                              'layer\'s weights into a new instance of the layer ' +
-                              'in stateful mode and feed it the learned initial ' +
-                              'state using the TODO function.' )
 
         super( SingleGateHybridUnit, self).__init__(**kwargs)
 
@@ -83,7 +72,7 @@ class SingleGateHybridUnit ( Layer ) :
         self.state_spec = InputSpec( ndim = 2)
 
         self.main_activation = lambda x : K.softsign(x)
-        self.gate_activation = lambda x : 0.5 + 0.5 * K.softsign( 2.0 * x )
+        self.gate_activation = lambda x : 0.5 + 0.5 * K.softsign( 4.0 * x )
 
         self.mat_W_0_initializer = initializers.get(mat_W_0_initializer)
         self.vec_b_0_initializer = initializers.get(vec_b_0_initializer)
