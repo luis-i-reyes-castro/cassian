@@ -21,7 +21,8 @@ from time import time
 
 from .data_management import Dataset
 from .batching import BatchSpecifications, BatchSample
-from .layers import VectorDependentGatedRNN
+from .core import SingleGateHybridUnit
+#from .layers import VectorDependentGatedRNN
 from .convenience import exists_file, ensure_directory
 from .convenience import serialize, de_serialize
 from .convenience import move_date
@@ -40,8 +41,8 @@ class CassianModel :
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     def __init__( self, dataset_filename, batch_size, timesteps,
-                        dim_reduction_layer_sizes = [ 512, 512, 256, 256, 32],
-                        VDGRNN_layer_sizes = [ 256, 256, 128, 128] ) :
+                        dim_reduction_layer_sizes = [ 512, 512],
+                        VDGRNN_layer_sizes = [ 256, 256] ) :
 
         print( 'Current task: Loading Dataset instance' )
         if not exists_file( dataset_filename) :
@@ -77,11 +78,10 @@ class CassianModel :
         last_output_vector = X_vecs
 
         for ( i, layer_size) in enumerate( self.dim_reduction_layer_sizes) :
-
             layer_name = 'Dim_Reduction-' + str(i+1)
-            last_output_vector = Dense( units = layer_size,
-                                        activation = 'softsign',
-                                        name = layer_name )( last_output_vector)
+            layer = Dense( name = layer_name, units = layer_size,
+                           activation = 'softsign')
+            last_output_vector = layer( last_output_vector )
             # shape = ( batch_size, None, dim_reduction_layer_dim)
 
         # -----------------------------------------------------------------------------
@@ -90,14 +90,9 @@ class CassianModel :
         last_output_ts = X_ts
 
         for ( i, layer_size) in enumerate( self.VDGRNN_layer_sizes) :
-
-            layer_name = 'VDGRNN-'+ str(i+1)
-            layer = VectorDependentGatedRNN( units = layer_size,
-                                             learn_initial_state_bias = True,
-                                             learn_initial_state_kernel = True,
-                                             architecture = 'single-gate',
-                                             name = layer_name)
-
+            layer_name = 'SGHU-'+ str(i+1)
+            layer = SingleGateHybridUnit( name = layer_name, units = layer_size,
+                                          return_sequences = True)
             last_output_ts = layer( [ last_output_vector, last_output_ts] )
             # shape = ( batch_size, None, layer_dim)
 
