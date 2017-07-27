@@ -22,7 +22,6 @@ from time import time
 from .data_management import Dataset
 from .batching import BatchSpecifications, BatchSample
 from .core import SingleGateHybridUnit
-#from .layers import VectorDependentGatedRNN
 from .convenience import exists_file, ensure_directory
 from .convenience import serialize, de_serialize
 from .convenience import move_date
@@ -32,17 +31,17 @@ from .convenience import save_df_to_excel
 class CassianModel :
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-    OUTPUT_DIR   = '/home/luis/cassian/trained-models/'
+    OUTPUT_DIR   = 'trained-models/'
     OUTPUT_FILE  = 'store-[STORE-ID]_model.pkl'
     WEIGHTS_FILE = 'store-[STORE-ID]_weights.h5'
-    RESULTS_DIR  = '/home/luis/cassian/results/'
+    RESULTS_DIR  = 'results/'
     RESULTS_FILE = 'store-[STORE-ID]_results.pkl'
     SUMMARY_FILE = 'store-[STORE-ID]_summary.xlsx'
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     def __init__( self, dataset_filename, batch_size, timesteps,
-                        dim_reduction_layer_sizes = [ 512, 512],
-                        VDGRNN_layer_sizes = [ 256, 256] ) :
+                        dense_layer_sizes = [ 512, 256, 256],
+                        SGHU_layer_sizes = [ 256, 256, 256] ) :
 
         print( 'Current task: Loading Dataset instance' )
         if not exists_file( dataset_filename) :
@@ -57,8 +56,8 @@ class CassianModel :
         self.timesteps       = timesteps
         self.steps_per_epoch = self.dataset.num_timesteps // ( batch_size * timesteps )
 
-        self.dim_reduction_layer_sizes = dim_reduction_layer_sizes
-        self.VDGRNN_layer_sizes        = VDGRNN_layer_sizes
+        self.dense_layer_sizes = dense_layer_sizes
+        self.SGHU_layer_sizes  = SGHU_layer_sizes
 
         self.outputs_list   = []
         self.loss_functions = {}
@@ -77,8 +76,8 @@ class CassianModel :
 
         last_output_vector = X_vecs
 
-        for ( i, layer_size) in enumerate( self.dim_reduction_layer_sizes) :
-            layer_name = 'Dim_Reduction-' + str(i+1)
+        for ( i, layer_size) in enumerate( self.dense_layer_sizes) :
+            layer_name = 'Feedforward-' + str(i+1)
             layer = Dense( name = layer_name, units = layer_size,
                            activation = 'softsign')
             last_output_vector = layer( last_output_vector )
@@ -89,8 +88,8 @@ class CassianModel :
 
         last_output_ts = X_ts
 
-        for ( i, layer_size) in enumerate( self.VDGRNN_layer_sizes) :
-            layer_name = 'SGHU-'+ str(i+1)
+        for ( i, layer_size) in enumerate( self.SGHU_layer_sizes) :
+            layer_name = 'SingleGateHybridUnit-'+ str(i+1)
             layer = SingleGateHybridUnit( name = layer_name, units = layer_size,
                                           return_sequences = True)
             last_output_ts = layer( [ last_output_vector, last_output_ts] )
@@ -106,7 +105,7 @@ class CassianModel :
         layer_names       = [ 'Sold', 'Is_On_Sale' ]
 
         def zero_one_softsign( tensor) :
-            return 0.5 + 0.5 * K.softsign( 2.0 * tensor )
+            return 0.5 + 0.5 * K.softsign( 4.0 * tensor )
 
         layer_activations = [ K.exp, zero_one_softsign ]
         layer_losses      = [ 'poisson', 'binary_crossentropy' ]
@@ -115,12 +114,12 @@ class CassianModel :
             zip( dense_layer_names, layer_names, layer_activations, layer_losses) :
 
             dense_layer = Dense( name = dense_layer_name,
-                                 input_dim = self.VDGRNN_layer_sizes[-1],
+                                 input_dim = self.SGHU_layer_sizes[-1],
                                  units = 1,
                                  activation = layer_activation)
 
             output_tensor = \
-            TimeDistributed( dense_layer, name = layer_name)( last_output_ts )
+            TimeDistributed( name = layer_name, layer = dense_layer)( last_output_ts )
 
             self.outputs_list.append( output_tensor)
             self.loss_functions[layer_name] = layer_loss
@@ -143,25 +142,25 @@ class CassianModel :
             zip( dense_layer_names, layer_names, layer_dims) :
 
             dense_layer = Dense( name = dense_layer_name,
-                                 input_dim = self.VDGRNN_layer_sizes[-1],
+                                 input_dim = self.SGHU_layer_sizes[-1],
                                  units = layer_dim,
                                  activation = 'softmax')
 
             output_tensor = \
-            TimeDistributed( dense_layer, name = layer_name)( last_output_ts )
+            TimeDistributed( name = layer_name, layer = dense_layer)( last_output_ts )
 
             self.outputs_list.append( output_tensor)
             self.loss_functions[layer_name] = layer_losses
 
         # -----------------------------------------------------------------------------
-        self.valid_metrics                = {}
-        self.valid_metrics['Sold']        = 'mae'
-        self.valid_metrics['Is_On_Sale']  = 'accuracy'
-        self.valid_metrics['Replenished'] = 'categorical_accuracy'
-        self.valid_metrics['Returned']    = 'categorical_accuracy'
-        self.valid_metrics['Trashed']     = 'categorical_accuracy'
-        self.valid_metrics['Found']       = 'categorical_accuracy'
-        self.valid_metrics['Missing']     = 'categorical_accuracy'
+        self.validation_metrics                = {}
+        self.validation_metrics['Sold']        = 'mae'
+        self.validation_metrics['Is_On_Sale']  = 'accuracy'
+        self.validation_metrics['Replenished'] = 'categorical_accuracy'
+        self.validation_metrics['Returned']    = 'categorical_accuracy'
+        self.validation_metrics['Trashed']     = 'categorical_accuracy'
+        self.validation_metrics['Found']       = 'categorical_accuracy'
+        self.validation_metrics['Missing']     = 'categorical_accuracy'
 
         # -----------------------------------------------------------------------------
         self.model = Model( inputs = [ X_vecs, X_ts],
@@ -187,7 +186,7 @@ class CassianModel :
 
         self.model.compile( optimizer = self.optimizer,
                             loss = self.loss_functions,
-                            metrics = self.valid_metrics)
+                            metrics = self.validation_metrics )
 
         return
 
@@ -195,12 +194,12 @@ class CassianModel :
     def save_model( self) :
 
         output_dict = {}
-        output_dict['dataset_filename']          = self.dataset_filename
-        output_dict['batch_size']                = self.batch_size
-        output_dict['timesteps']                 = self.timesteps
-        output_dict['dim_reduction_layer_sizes'] = self.dim_reduction_layer_sizes
-        output_dict['VDGRNN_layer_sizes']        = self.VDGRNN_layer_sizes
-        output_dict['weights_filename']          = self.weights_file
+        output_dict['dataset_filename']  = self.dataset_filename
+        output_dict['batch_size']        = self.batch_size
+        output_dict['timesteps']         = self.timesteps
+        output_dict['dense_layer_sizes'] = self.dense_layer_sizes
+        output_dict['SGHU_layer_sizes']  = self.SGHU_layer_sizes
+        output_dict['weights_filename']  = self.weights_file
 
         print( 'Saving CassianModel instance to file:', self.output_file)
         serialize( output_dict, self.output_file)
@@ -228,8 +227,8 @@ class CassianModel :
         cassian = CassianModel( input_dict['dataset_filename'],
                                 input_dict['batch_size'],
                                 input_dict['timesteps'],
-                                input_dict['dim_reduction_layer_sizes'],
-                                input_dict['VDGRNN_layer_sizes'] )
+                                input_dict['dense_layer_sizes'],
+                                input_dict['SGHU_layer_sizes'] )
 
         cassian.model.load_weights( input_dict['weights_filename'] )
 
