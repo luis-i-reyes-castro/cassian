@@ -259,18 +259,6 @@ class SingleGateHybridUnit ( Layer ) :
         Gate_S = self.gate_activation( K.dot( X_vecs, self.mat_W_s) \
                                      + K.tile( self.vec_b_s, ( batch_size, 1) ) )
 
-#        # Applies dropout to the timeseries inputs if applicable. Regardless,
-#        # at the end tensor X_ts has shape ( batch_size, timesteps, ts_input_dim).
-#        if 0 < self.input_dropout < 1 :
-#            timesteps = K.shape( X_ts)[1]
-#            ones = K.ones_like( X_ts[ :, 0, :] )
-#            # shape = ( batch_size, ts_input_dim)
-#            array_01s = K.dropout( ones, self.input_dropout)
-#            array_01s = K.repeat( array_01s, timesteps)
-#            # shape = ( batch_size, timesteps, ts_input_dim)
-#            X_ts._uses_learning_phase = True
-#            X_ts = K.in_train_phase( X_ts * array_01s, X_ts, training)
-
         # Builds input dropout mask for if applicable. Regardless, at the end
         # tensor State_dp_mask has shape ( batch_size, ts_input_dim).
         input_ones    = K.ones_like( X_ts[ :, 0, :] )
