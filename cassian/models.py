@@ -180,7 +180,7 @@ class CassianModel :
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     def compile_model( self) :
 
-        self.optimizer = optimizers.Adam( lr = 2e-5,
+        self.optimizer = optimizers.Adam( lr = 1e-4,
                                           beta_1 = 0.9,
                                           beta_2 = 0.995 )
 
@@ -243,7 +243,9 @@ class CassianModel :
                            show_shapes = True, to_file = filename)
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-    def train_on_dataset( self, epochs = 1, workers = 4) :
+    def train_on_dataset( self, epochs = 1, patience = 4, workers = 4) :
+
+        print( 'Current task: Training for ' + str(epochs) + ' epochs' )
 
         def batch_generator( dataset) :
 
@@ -282,7 +284,10 @@ class CassianModel :
 
         ( dataset_train, dataset_valid) = self.dataset.split(0.68)
 
-        print( 'Current task: Training for ' + str(epochs) + ' epochs' )
+        pieces_per_epoch       = 10
+        actual_patience        = patience * pieces_per_epoch
+        actual_epochs          = epochs * pieces_per_epoch
+        actual_steps_per_epoch = self.steps_per_epoch // pieces_per_epoch
 
         tensorboard_logs = str('tensorboard-logs/{}').format(time())
         callbacks = [ ModelCheckpoint( self.weights_file,
@@ -290,23 +295,19 @@ class CassianModel :
                                        save_weights_only = True,
                                        save_best_only = True),
                       EarlyStopping( monitor = 'val_loss',
-                                     patience = 20, mode = 'min'),
+                                     patience = actual_patience, mode = 'min'),
                       EarlyStopping( monitor = 'val_Sold_mean_absolute_error',
-                                     patience = 20, mode = 'min'),
+                                     patience = actual_patience, mode = 'min'),
                       TensorBoard( log_dir = tensorboard_logs,
                                    write_graph = False) ]
 
         self.save_model()
 
-        visualization_factor = 10
-        new_steps_per_epoch  = self.steps_per_epoch // visualization_factor
-        new_epochs           = epochs * visualization_factor
-
         self.model.fit_generator( generator = batch_generator( dataset_train),
                                   validation_data = batch_generator( dataset_valid),
-                                  steps_per_epoch = new_steps_per_epoch,
-                                  validation_steps = new_steps_per_epoch,
-                                  epochs = new_epochs,
+                                  epochs = actual_epochs,
+                                  steps_per_epoch = actual_steps_per_epoch,
+                                  validation_steps = actual_steps_per_epoch,
                                   workers = workers,
                                   callbacks = callbacks,
                                   pickle_safe = True )
