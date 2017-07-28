@@ -182,7 +182,7 @@ class CassianModel :
 
         self.optimizer = optimizers.Adam( lr = 1e-4,
                                           beta_1 = 0.9,
-                                          beta_2 = 0.995 )
+                                          beta_2 = 0.99 )
 
         self.model.compile( optimizer = self.optimizer,
                             loss = self.loss_functions,
@@ -291,11 +291,10 @@ class CassianModel :
 
         tensorboard_logs = str('tensorboard-logs/{}').format(time())
         callbacks = [ ModelCheckpoint( self.weights_file,
-                                       monitor = 'val_loss', mode = 'min',
+                                       monitor = 'val_Sold_mean_absolute_error',
+                                       mode = 'min',
                                        save_weights_only = True,
                                        save_best_only = True),
-                      EarlyStopping( monitor = 'val_loss',
-                                     patience = actual_patience, mode = 'min'),
                       EarlyStopping( monitor = 'val_Sold_mean_absolute_error',
                                      patience = actual_patience, mode = 'min'),
                       TensorBoard( log_dir = tensorboard_logs,
