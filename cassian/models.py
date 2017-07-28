@@ -282,7 +282,7 @@ class CassianModel :
 
             return
 
-        ( dataset_train, dataset_valid) = self.dataset.split(0.68)
+        ( dataset_train, dataset_valid) = self.dataset.split(0.75)
 
         pieces_per_epoch       = 10
         actual_patience        = patience * pieces_per_epoch
@@ -295,7 +295,7 @@ class CassianModel :
                                        mode = 'min',
                                        save_weights_only = True,
                                        save_best_only = True),
-                      EarlyStopping( monitor = 'val_Sold_mean_absolute_error',
+                      EarlyStopping( monitor = 'Sold_mean_absolute_error',
                                      patience = actual_patience, mode = 'min'),
                       TensorBoard( log_dir = tensorboard_logs,
                                    write_graph = False) ]
