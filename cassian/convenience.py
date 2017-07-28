@@ -59,6 +59,11 @@ def get_date_today() :
     return dtdt.today().date()
 
 # -------------------------------------------------------------------------------------
+def get_timestamp() :
+
+    return dtdt.now().strftime('%h-%d_%H:%M:%S')
+
+# -------------------------------------------------------------------------------------
 def move_date( date, delta_days) :
 
     return date + dt.timedelta( days = delta_days)

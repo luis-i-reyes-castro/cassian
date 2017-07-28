@@ -17,14 +17,13 @@ from keras.models import Model
 from keras import optimizers
 from keras.callbacks import ModelCheckpoint, EarlyStopping, TensorBoard
 from keras.utils.vis_utils import plot_model
-from time import time
 
 from .data_management import Dataset
 from .batching import BatchSpecifications, BatchSample
 from .core import SingleGateHybridUnit
 from .convenience import exists_file, ensure_directory
 from .convenience import serialize, de_serialize
-from .convenience import move_date
+from .convenience import get_timestamp, move_date
 from .convenience import save_df_to_excel
 
 # =====================================================================================
@@ -37,6 +36,7 @@ class CassianModel :
     RESULTS_DIR  = 'results/'
     RESULTS_FILE = 'store-[STORE-ID]_results.pkl'
     SUMMARY_FILE = 'store-[STORE-ID]_summary.xlsx'
+    TB_LOG_DIR   = 'tensorboard-logs/'
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     def __init__( self, dataset_filename, batch_size, timesteps,
@@ -180,9 +180,10 @@ class CassianModel :
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     def compile_model( self) :
 
-        self.optimizer = optimizers.Adam( lr = 1e-4,
-                                          beta_1 = 0.9,
-                                          beta_2 = 0.99 )
+        self.optimizer = optimizers.Adamax( lr = 2E-4,
+                                            beta_1 = 0.9,
+                                            beta_2 = 0.99,
+                                            epsilon = 1E-6 )
 
         self.model.compile( optimizer = self.optimizer,
                             loss = self.loss_functions,
@@ -243,7 +244,7 @@ class CassianModel :
                            show_shapes = True, to_file = filename)
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-    def train_on_dataset( self, epochs = 1, patience = 4, workers = 4) :
+    def train_on_dataset( self, epochs = 1, patience = 10, workers = 4) :
 
         print( 'Current task: Training for ' + str(epochs) + ' epochs' )
 
@@ -289,7 +290,8 @@ class CassianModel :
         actual_epochs          = epochs * pieces_per_epoch
         actual_steps_per_epoch = self.steps_per_epoch // pieces_per_epoch
 
-        tensorboard_logs = str('tensorboard-logs/{}').format(time())
+        ensure_directory(self.TB_LOG_DIR)
+
         callbacks = [ ModelCheckpoint( self.weights_file,
                                        monitor = 'val_Sold_mean_absolute_error',
                                        mode = 'min',
@@ -297,7 +299,7 @@ class CassianModel :
                                        save_best_only = True),
                       EarlyStopping( monitor = 'Sold_mean_absolute_error',
                                      patience = actual_patience, mode = 'min'),
-                      TensorBoard( log_dir = tensorboard_logs,
+                      TensorBoard( log_dir = self.TB_LOG_DIR + get_timestamp(),
                                    write_graph = False) ]
 
         self.save_model()
