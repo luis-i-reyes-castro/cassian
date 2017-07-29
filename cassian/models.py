@@ -31,12 +31,12 @@ class CassianModel :
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     OUTPUT_DIR   = 'trained-models/'
-    OUTPUT_FILE  = 'store-[STORE-ID]_model.pkl'
-    WEIGHTS_FILE = 'store-[STORE-ID]_weights.h5'
+    OUTPUT_FILE  = 'store-[STORE-ID]_model_[TIMESTAMP].pkl'
+    WEIGHTS_FILE = 'store-[STORE-ID]_weights_[TIMESTAMP].h5'
     RESULTS_DIR  = 'results/'
     RESULTS_FILE = 'store-[STORE-ID]_results.pkl'
     SUMMARY_FILE = 'store-[STORE-ID]_summary.xlsx'
-    TB_LOG_DIR   = 'tensorboard-logs/'
+    TB_LOG_DIR   = 'tensorboard-logs/store-[STORE-ID]/[TIMESTAMP]'
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     def __init__( self, dataset_filename, batch_size, timesteps,
@@ -51,7 +51,9 @@ class CassianModel :
         self.dataset = Dataset.load( self.dataset_filename)
 
         print( 'Current task: Building CassianModel instance' )
-        self.store_id        = self.dataset.store_id
+        self.store_id  = self.dataset.store_id
+        self.timestamp = get_timestamp()
+
         self.batch_size      = batch_size
         self.timesteps       = timesteps
         self.steps_per_epoch = self.dataset.num_timesteps // ( batch_size * timesteps )
@@ -170,20 +172,30 @@ class CassianModel :
         # -----------------------------------------------------------------------------
         ensure_directory( self.OUTPUT_DIR)
 
-        self.output_file  = self.OUTPUT_DIR \
-                          + self.OUTPUT_FILE.replace( '[STORE-ID]', str(self.store_id))
-        self.weights_file = self.OUTPUT_DIR \
-                          + self.WEIGHTS_FILE.replace( '[STORE-ID]', str(self.store_id))
+        self.output_file = self.OUTPUT_DIR + self.OUTPUT_FILE
+        self.output_file = self.output_file.replace( '[STORE-ID]', str(self.store_id))
+        self.output_file = self.output_file.replace( '[TIMESTAMP]', self.timestamp)
+
+        self.weights_file = self.OUTPUT_DIR + self.WEIGHTS_FILE
+        self.weights_file = self.weights_file.replace( '[STORE-ID]', str(self.store_id))
+        self.weights_file = self.weights_file.replace( '[TIMESTAMP]', self.timestamp)
+
+        self.tb_log_dir = self.TB_LOG_DIR.replace( '[STORE-ID]', str(self.store_id))
+        self.tb_log_dir = self.tb_log_dir.replace( '[TIMESTAMP]', self.timestamp)
 
         return
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     def compile_model( self) :
 
-        self.optimizer = optimizers.Adamax( lr = 2E-4,
-                                            beta_1 = 0.9,
-                                            beta_2 = 0.99,
-                                            epsilon = 1E-6 )
+        self.optimizer = optimizers.SGD( lr = 0.001,
+                                         momentum = 0.9,
+                                         nesterov = True )
+
+#        self.optimizer = optimizers.Adamax( lr = 0.001,
+#                                            beta_1 = 0.9,
+#                                            beta_2 = 0.99,
+#                                            epsilon = 1E-6 )
 
         self.model.compile( optimizer = self.optimizer,
                             loss = self.loss_functions,
@@ -290,7 +302,7 @@ class CassianModel :
         actual_epochs          = epochs * pieces_per_epoch
         actual_steps_per_epoch = self.steps_per_epoch // pieces_per_epoch
 
-        ensure_directory(self.TB_LOG_DIR)
+        ensure_directory(self.tb_log_dir)
 
         callbacks = [ ModelCheckpoint( self.weights_file,
                                        monitor = 'val_Sold_mean_absolute_error',
@@ -299,8 +311,7 @@ class CassianModel :
                                        save_best_only = True),
                       EarlyStopping( monitor = 'Sold_mean_absolute_error',
                                      patience = actual_patience, mode = 'min'),
-                      TensorBoard( log_dir = self.TB_LOG_DIR + get_timestamp(),
-                                   write_graph = False) ]
+                      TensorBoard( log_dir = self.tb_log_dir, write_graph = False) ]
 
         self.save_model()
 

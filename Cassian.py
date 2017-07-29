@@ -25,14 +25,11 @@ def show_usage() :
 
 def main( argv) :
 
-    opts_short = 'hls:fTle:b:t:w:Pp:'
+    opts_short = 'hls:fTl:e:b:t:w:Pp:'
     opts_long  = [ 'help', 'list', 'store=',
-                   'fetch', 'build_dataset_only', 'train', 'load',
+                   'fetch', 'build_dataset_only', 'train', 'load=',
                    'epochs=', 'batch_size=', 'timesteps=', 'workers=',
                    'predict', 'plot=' ]
-
-    model_file   = 'trained-models/store-[STORE-ID]_model.pkl'
-    results_file = 'results/store-[STORE-ID]_results.pkl'
 
     try :
         opts, args = getopt.getopt( argv, opts_short, opts_long)
@@ -81,6 +78,7 @@ def main( argv) :
 
         if opt in ( '-l', '--load') :
             mode_load = True
+            model_to_load = str(arg)
 
         if opt in ( '-T', '--train') :
             mode_train = True
@@ -131,8 +129,7 @@ def main( argv) :
         from cassian.models import CassianModel
 
         if mode_load :
-            model_file = model_file.replace( '[STORE-ID]', str(store_id))
-            cassian    = CassianModel.load( model_file)
+            cassian = CassianModel.load( model_to_load)
         else :
             dataset_file = Dataset.OUTPUT_DIR + Dataset.OUTPUT_FILE
             dataset      = dataset_file.replace( '[STORE-ID]', str(store_id))
@@ -144,9 +141,7 @@ def main( argv) :
 
         from cassian.models import CassianModel
 
-        model_file = model_file.replace( '[STORE-ID]', str(store_id))
-        cassian    = CassianModel.load( model_file)
-
+        cassian = CassianModel.load( model_to_load)
         cassian.compute_predictions()
 
     if mode_plot :
@@ -154,6 +149,7 @@ def main( argv) :
         from cassian.convenience import de_serialize
         import matplotlib.pyplot as plt
 
+        results_file = CassianModel.RESULTS_DIR + CassianModel.RESULTS_FILE
         results_file = results_file.replace( '[STORE-ID]', str(store_id))
         results      = de_serialize( results_file)
         predictions  = results['predictions']
