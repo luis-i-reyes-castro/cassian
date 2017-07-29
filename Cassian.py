@@ -135,6 +135,7 @@ def main( argv) :
             dataset      = dataset_file.replace( '[STORE-ID]', str(store_id))
             cassian      = CassianModel( dataset, batch_size, timesteps)
 
+        cassian.plot_model()
         cassian.train_on_dataset( epochs = epochs, workers = workers)
 
     if mode_predict :
