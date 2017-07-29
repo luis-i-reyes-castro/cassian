@@ -40,7 +40,7 @@ class CassianModel :
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     def __init__( self, dataset_filename, batch_size, timesteps,
-                        dense_layer_sizes = [ 512 ],
+                        dense_layer_sizes = [],
                         SGHU_layer_sizes = [ 512 ] ) :
 
         print( 'Current task: Loading Dataset instance' )
@@ -54,10 +54,8 @@ class CassianModel :
         self.store_id  = self.dataset.store_id
         self.timestamp = get_timestamp()
 
-        self.batch_size      = batch_size
-        self.timesteps       = timesteps
-        self.steps_per_epoch = self.dataset.num_timesteps // ( batch_size * timesteps )
-
+        self.batch_size        = batch_size
+        self.timesteps         = timesteps
         self.dense_layer_sizes = dense_layer_sizes
         self.SGHU_layer_sizes  = SGHU_layer_sizes
 
@@ -256,7 +254,7 @@ class CassianModel :
                            show_shapes = True, to_file = filename)
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-    def train_on_dataset( self, epochs = 1, patience = 10, workers = 4) :
+    def train_on_dataset( self, epochs = 1, patience = 40, workers = 4) :
 
         print( 'Current task: Training for ' + str(epochs) + ' epochs' )
 
@@ -295,12 +293,16 @@ class CassianModel :
 
             return
 
-        ( dataset_train, dataset_valid) = self.dataset.split(0.75)
+        pieces_per_epoch = 1
+        epochs           = pieces_per_epoch * epochs
+        patience         = pieces_per_epoch * patience
 
-        pieces_per_epoch       = 10
-        actual_patience        = patience * pieces_per_epoch
-        actual_epochs          = epochs * pieces_per_epoch
-        actual_steps_per_epoch = self.steps_per_epoch // pieces_per_epoch
+        ( dataset_train, dataset_valid) = self.dataset.split(0.68)
+
+        steps_per_epoch_train = dataset_train.num_timesteps \
+                              // ( self.batch_size * self.timesteps * pieces_per_epoch )
+        steps_per_epoch_valid = dataset_valid.num_timesteps \
+                              // ( self.batch_size * self.timesteps * pieces_per_epoch )
 
         ensure_directory(self.tb_log_dir)
 
@@ -310,16 +312,16 @@ class CassianModel :
                                        save_weights_only = True,
                                        save_best_only = True),
                       EarlyStopping( monitor = 'Sold_mean_absolute_error',
-                                     patience = actual_patience, mode = 'min'),
+                                     patience = patience, mode = 'min'),
                       TensorBoard( log_dir = self.tb_log_dir, write_graph = False) ]
 
         self.save_model()
 
         self.model.fit_generator( generator = batch_generator( dataset_train),
                                   validation_data = batch_generator( dataset_valid),
-                                  epochs = actual_epochs,
-                                  steps_per_epoch = actual_steps_per_epoch,
-                                  validation_steps = actual_steps_per_epoch,
+                                  epochs = epochs,
+                                  steps_per_epoch = steps_per_epoch_train,
+                                  validation_steps = steps_per_epoch_valid,
                                   workers = workers,
                                   callbacks = callbacks,
                                   pickle_safe = True )
