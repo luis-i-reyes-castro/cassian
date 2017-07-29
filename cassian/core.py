@@ -53,7 +53,7 @@ class SingleGateHybridUnit ( Layer ) :
                   mat_P_z_initializer = 'glorot_uniform',
                   mat_W_z_initializer = 'glorot_uniform',
                   mat_U_z_initializer = 'glorot_uniform',
-                  vec_b_z_initializer = +0.75,
+                  vec_b_z_initializer = 0.0,
                   activity_reg = None,
                   vector_dropout = 0.,
                   input_dropout = 0.,
@@ -72,7 +72,7 @@ class SingleGateHybridUnit ( Layer ) :
         self.state_spec = InputSpec( ndim = 2)
 
         self.main_activation = lambda x : K.softsign(x)
-        self.gate_activation = lambda x : 0.5 + 0.5 * K.softsign( 4.0 * x )
+        self.gate_activation = lambda x : 0.5 + 0.5 * K.softsign( 2.0 * x )
 
         self.mat_W_0_initializer = initializers.get(mat_W_0_initializer)
         self.vec_b_0_initializer = initializers.get(vec_b_0_initializer)
