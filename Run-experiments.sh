@@ -1,7 +1,7 @@
 #!/bin/bash
 
 STORE=103
-NUM_RUNS=20
+NUM_RUNS=10
 EPOCHS_PER_RUN=40
 
 for i in $(seq 1 $NUM_RUNS)
