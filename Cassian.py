@@ -146,6 +146,7 @@ def main( argv) :
 
     if mode_plot :
 
+        from cassian.models import CassianModel
         from cassian.convenience import de_serialize
         import matplotlib.pyplot as plt
 
