@@ -20,7 +20,7 @@ from keras.utils.vis_utils import plot_model
 
 from .data_management import Dataset
 from .batching import BatchSpecifications, BatchSample
-from .core import SingleGateHybridUnit
+from .core import HybridUnit
 from .convenience import exists_file, ensure_directory
 from .convenience import serialize, de_serialize
 from .convenience import get_timestamp, move_date
@@ -40,8 +40,8 @@ class CassianModel :
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     def __init__( self, dataset_filename, batch_size, timesteps,
-                        dense_layer_sizes = [ 512, 256, 256],
-                        SGHU_layer_sizes = [ 256, 256, 256] ) :
+                        dense_layer_sizes = [ 512 ],
+                        SGHU_layer_sizes = [ 512 ] ) :
 
         print( 'Current task: Loading Dataset instance' )
         if not exists_file( dataset_filename) :
@@ -92,8 +92,8 @@ class CassianModel :
 
         for ( i, layer_size) in enumerate( self.SGHU_layer_sizes) :
             layer_name = 'SingleGateHybridUnit-'+ str(i+1)
-            layer = SingleGateHybridUnit( name = layer_name, units = layer_size,
-                                          return_sequences = True)
+            layer = HybridUnit( name = layer_name, units = layer_size,
+                                return_sequences = True)
             last_output_ts = layer( [ last_output_vector, last_output_ts] )
             # shape = ( batch_size, None, layer_dim)
 

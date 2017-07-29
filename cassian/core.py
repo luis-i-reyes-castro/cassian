@@ -36,7 +36,7 @@ from keras.engine import Layer, InputSpec
 from keras import initializers, regularizers
 
 # =====================================================================================
-class SingleGateHybridUnit ( Layer ) :
+class HybridUnit ( Layer ) :
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     def __init__( self, units,
@@ -48,18 +48,11 @@ class SingleGateHybridUnit ( Layer ) :
                   vec_b_0_initializer = 'zero',
                   mat_P_d_initializer = 'glorot_uniform',
                   mat_W_d_initializer = 'glorot_uniform',
-                  mat_U_d_initializer = 'identity',
                   vec_b_d_initializer = 'zero',
-                  mat_P_z_initializer = 'glorot_uniform',
-                  mat_W_z_initializer = 'glorot_uniform',
-                  mat_U_z_initializer = 'glorot_uniform',
-                  vec_b_z_initializer = 0.0,
                   activity_reg = None,
-                  vector_dropout = 0.,
-                  input_dropout = 0.,
-                  state_dropout = 0., **kwargs) :
+                  vector_dropout = 0., input_dropout = 0., **kwargs) :
 
-        super( SingleGateHybridUnit, self).__init__(**kwargs)
+        super( HybridUnit, self).__init__(**kwargs)
 
         self.units            = units
         self.stateful         = stateful
@@ -79,20 +72,12 @@ class SingleGateHybridUnit ( Layer ) :
 
         self.mat_P_d_initializer = initializers.get(mat_P_d_initializer)
         self.mat_W_d_initializer = initializers.get(mat_W_d_initializer)
-        self.mat_U_d_initializer = initializers.get(mat_U_d_initializer)
         self.vec_b_d_initializer = initializers.get(vec_b_d_initializer)
-
-        self.mat_P_z_initializer = initializers.get(mat_P_z_initializer)
-        self.mat_W_z_initializer = initializers.get(mat_W_z_initializer)
-        self.mat_U_z_initializer = initializers.get(mat_U_z_initializer)
-        self.vec_b_z_initializer = initializers.RandomNormal( vec_b_z_initializer,
-                                                              1.0 / np.sqrt(units) )
 
         self.activity_regularizer = regularizers.get( activity_reg)
 
         self.vector_dropout = min( 1., max( 0., vector_dropout) )
         self.input_dropout  = min( 1., max( 0., input_dropout) )
-        self.state_dropout  = min( 1., max( 0., state_dropout) )
 
         return
 
@@ -155,13 +140,7 @@ class SingleGateHybridUnit ( Layer ) :
 
         self.mat_P_d_shape = ( vec_input_dim, self.units)
         self.mat_W_d_shape = ( ts_input_dim, self.units)
-        self.mat_U_d_shape = ( self.units, self.units)
         self.vec_b_d_shape = ( 1, self.units)
-
-        self.mat_P_z_shape = ( vec_input_dim, self.units)
-        self.mat_W_z_shape = ( ts_input_dim, self.units)
-        self.mat_U_z_shape = ( self.units, self.units)
-        self.vec_b_z_shape = ( 1, self.units)
 
         self.mat_W_0 = self.add_weight( name = 'mat_W_0',
                                         shape = self.mat_W_0_shape,
@@ -176,25 +155,9 @@ class SingleGateHybridUnit ( Layer ) :
         self.mat_W_d = self.add_weight( name = 'mat_W_d',
                                         shape = self.mat_W_d_shape,
                                         initializer = self.mat_W_d_initializer)
-        self.mat_U_d = self.add_weight( name = 'mat_U_d',
-                                        shape = self.mat_U_d_shape,
-                                        initializer = self.mat_U_d_initializer)
         self.vec_b_d = self.add_weight( name = 'vec_b_d',
                                         shape = self.vec_b_d_shape,
                                         initializer = self.vec_b_d_initializer)
-
-        self.mat_P_z = self.add_weight( name = 'mat_P_z',
-                                        shape = self.mat_P_z_shape,
-                                        initializer = self.mat_P_z_initializer)
-        self.mat_W_z = self.add_weight( name = 'mat_W_z',
-                                        shape = self.mat_W_z_shape,
-                                        initializer = self.mat_W_d_initializer)
-        self.mat_U_z = self.add_weight( name = 'mat_U_z',
-                                        shape = self.mat_U_z_shape,
-                                        initializer = self.mat_U_z_initializer)
-        self.vec_b_z = self.add_weight( name = 'vec_b_z',
-                                        shape = self.vec_b_z_shape,
-                                        initializer = self.vec_b_z_initializer)
 
         initial_state_shape = ( batch_size, self.units)
         self.initial_state  = K.zeros( initial_state_shape)
@@ -205,7 +168,7 @@ class SingleGateHybridUnit ( Layer ) :
         else :
             self.states = [ None ]
 
-        super( SingleGateHybridUnit, self).build( input_shape)
+        super( HybridUnit, self).build( input_shape)
 
         return
 
@@ -214,7 +177,7 @@ class SingleGateHybridUnit ( Layer ) :
 
         self.check_inputs( inputs)
 
-        return super( SingleGateHybridUnit, self).__call__( inputs, **kwargs)
+        return super( HybridUnit, self).__call__( inputs, **kwargs)
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     def call( self, inputs, mask = None, training = None) :
@@ -259,17 +222,8 @@ class SingleGateHybridUnit ( Layer ) :
             array_01s = K.dropout( input_ones, self.input_dropout)
             Input_dp_mask = K.in_train_phase( array_01s, input_ones, training)
 
-        # Builds state dropout mask for if applicable. Regardless, at the end
-        # tensor State_dp_mask has shape ( batch_size, units).
-        state_ones    = K.ones_like( self.initial_state )
-        State_dp_mask = state_ones
-        if 0 < self.state_dropout < 1 :
-            array_01s = K.dropout( state_ones, self.state_dropout)
-            State_dp_mask = K.in_train_phase( array_01s, state_ones, training)
-
         # Precomputes feedforward terms
         X_vecs_dot_mat_P_d = K.dot( X_vecs, self.mat_P_d)
-        X_vecs_dot_mat_P_z = K.dot( X_vecs, self.mat_P_z)
 
         # -----------------------------------------------------------------------------
         # For each timestep t ...
@@ -279,25 +233,15 @@ class SingleGateHybridUnit ( Layer ) :
             X_t = X_t * Input_dp_mask
             # Previous state H_{t-1} is list containing a single tensor of
             # shape ( batch_size, units).
-            H_tm1 = list_of_H_tm1[0] * State_dp_mask
+            H_tm1 = list_of_H_tm1[0]
 
             # Computes state update vectors; shape ( batch_size, units).
-            Delta_H_t = \
-            self.main_activation( X_vecs_dot_mat_P_d \
-                                + K.dot( X_t, self.mat_W_d) \
-                                + K.dot( H_tm1, self.mat_U_d) \
-                                + K.tile( self.vec_b_d, ( batch_size, 1) ) )
+            H_t = self.main_activation( H_tm1 \
+                                      + X_vecs_dot_mat_P_d
+                                      + K.dot( X_t, self.mat_W_d) \
+                                      + K.tile( self.vec_b_d, ( batch_size, 1) ) )
 
-            # Computes update gate vectors; shape ( batch_size, units).
-            Gate_Z_t = \
-            self.gate_activation( X_vecs_dot_mat_P_z \
-                                + K.dot( X_t, self.mat_W_z) \
-                                + K.dot( H_tm1, self.mat_U_z) \
-                                + K.tile( self.vec_b_z, ( batch_size, 1) ) )
-
-            # Computes current state; shape ( batch_size, units).
-            H_t = ( 1 - Gate_Z_t ) * H_tm1 + Gate_Z_t * Delta_H_t
-            if 0 < self.input_dropout + self.state_dropout :
+            if 0 < self.input_dropout :
                 H_t._uses_learning_phase = True
 
             return ( H_t, [H_t] )
@@ -314,7 +258,7 @@ class SingleGateHybridUnit ( Layer ) :
             updates = [ ( self.states[0], states[0]) ]
             self.add_update( updates, inputs)
 
-        if 0 < self.input_dropout + self.state_dropout:
+        if 0 < self.input_dropout :
             last_output._uses_learning_phase = True
             outputs._uses_learning_phase = True
 
@@ -371,7 +315,7 @@ class SingleGateHybridUnit ( Layer ) :
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     def get_config(self) :
 
-        base_config = super( SingleGateHybridUnit, self).get_config()
+        base_config = super( HybridUnit, self).get_config()
 
         config = { 'units' : self.units,
                    'stateful': self.stateful,
@@ -379,7 +323,6 @@ class SingleGateHybridUnit ( Layer ) :
                    'go_backwards' : self.go_backwards,
                    'unroll': self.unroll,
                    'vector_dropout' : self.vector_dropout,
-                   'input_dropout' : self.input_dropout,
-                   'state_dropout' : self.state_dropout }
+                   'input_dropout' : self.input_dropout }
 
         return dict( list( base_config.items() ) + list( config.items() ) )
