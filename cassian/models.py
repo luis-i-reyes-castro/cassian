@@ -186,11 +186,11 @@ class CassianModel :
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     def compile_model( self) :
 
-        self.optimizer = optimizers.SGD( lr = 0.001,
+        self.optimizer = optimizers.SGD( lr = 1E-4,
                                          momentum = 0.9,
                                          nesterov = True )
 
-#        self.optimizer = optimizers.Adamax( lr = 0.001,
+#        self.optimizer = optimizers.Adamax( lr = 1E-4,
 #                                            beta_1 = 0.9,
 #                                            beta_2 = 0.99,
 #                                            epsilon = 1E-6 )
