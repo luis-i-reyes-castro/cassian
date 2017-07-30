@@ -44,9 +44,14 @@ class HybridUnit ( Layer ) :
                   return_sequences = False,
                   go_backwards = False,
                   unroll = False,
-                  mat_W_0_initializer = 'glorot_uniform',
+                  mat_A_s_initializer = 'glorot_uniform',
+                  vec_b_s_initializer = 'zero',
+                  mat_A_0_initializer = 'glorot_uniform',
                   vec_b_0_initializer = 'zero',
-                  mat_P_d_initializer = 'glorot_uniform',
+                  mat_W_p_initializer = 'glorot_uniform',
+                  vec_b_p_initializer = 'zero',
+                  mat_W_i_initializer = 'glorot_uniform',
+                  vec_b_i_initializer = 'zero',
                   mat_W_d_initializer = 'glorot_uniform',
                   vec_b_d_initializer = 'zero',
                   activity_reg = None,
@@ -67,10 +72,15 @@ class HybridUnit ( Layer ) :
         self.main_activation = lambda x : K.softsign(x)
         self.gate_activation = lambda x : 0.5 + 0.5 * K.softsign( 2.0 * x )
 
-        self.mat_W_0_initializer = initializers.get(mat_W_0_initializer)
+        self.mat_A_s_initializer = initializers.get(mat_A_s_initializer)
+        self.vec_b_s_initializer = initializers.get(vec_b_s_initializer)
+        self.mat_A_0_initializer = initializers.get(mat_A_0_initializer)
         self.vec_b_0_initializer = initializers.get(vec_b_0_initializer)
 
-        self.mat_P_d_initializer = initializers.get(mat_P_d_initializer)
+        self.mat_W_p_initializer = initializers.get(mat_W_p_initializer)
+        self.vec_b_p_initializer = initializers.get(vec_b_p_initializer)
+        self.mat_W_i_initializer = initializers.get(mat_W_i_initializer)
+        self.vec_b_i_initializer = initializers.get(vec_b_i_initializer)
         self.mat_W_d_initializer = initializers.get(mat_W_d_initializer)
         self.vec_b_d_initializer = initializers.get(vec_b_d_initializer)
 
@@ -135,29 +145,62 @@ class HybridUnit ( Layer ) :
                             InputSpec( shape = ( batch_size, timesteps, ts_input_dim) ) ]
         self.state_spec =   InputSpec( shape = ( batch_size, self.units) )
 
-        self.mat_W_0_shape = ( vec_input_dim, self.units)
-        self.vec_b_0_shape = ( 1, self.units)
+        mat_A_s_shape = ( vec_input_dim, self.units)
+        vec_b_s_shape = ( 1, self.units)
+        mat_A_0_shape = ( vec_input_dim, self.units)
+        vec_b_0_shape = ( 1, self.units)
 
-        self.mat_P_d_shape = ( vec_input_dim, self.units)
-        self.mat_W_d_shape = ( ts_input_dim, self.units)
-        self.vec_b_d_shape = ( 1, self.units)
+        self.mat_A_s = self.add_weight( name = 'mat_A_s',
+                                        shape = mat_A_s_shape,
+                                        initializer = self.mat_A_s_initializer)
 
-        self.mat_W_0 = self.add_weight( name = 'mat_W_0',
-                                        shape = self.mat_W_0_shape,
-                                        initializer = self.mat_W_0_initializer)
+        self.vec_b_s = self.add_weight( name = 'vec_b_s',
+                                        shape = vec_b_s_shape,
+                                        initializer = self.vec_b_s_initializer)
+        self.vec_b_s = K.tile( self.vec_b_s, ( batch_size, 1) )
+
+        self.mat_A_0 = self.add_weight( name = 'mat_A_0',
+                                        shape = mat_A_0_shape,
+                                        initializer = self.mat_A_0_initializer)
+
         self.vec_b_0 = self.add_weight( name = 'vec_b_0',
-                                        shape = self.vec_b_0_shape,
+                                        shape = vec_b_0_shape,
                                         initializer = self.vec_b_0_initializer)
+        self.vec_b_0 = K.tile( self.vec_b_0, ( batch_size, 1) )
 
-        self.mat_P_d = self.add_weight( name = 'mat_P_d',
-                                        shape = self.mat_P_d_shape,
-                                        initializer = self.mat_P_d_initializer)
+        mat_W_p_shape = ( ts_input_dim, self.units)
+        vec_b_p_shape = ( 1, self.units)
+        mat_W_i_shape = ( ts_input_dim, self.units)
+        vec_b_i_shape = ( 1, self.units)
+        mat_W_d_shape = ( ts_input_dim, self.units)
+        vec_b_d_shape = ( 1, self.units)
+
+        self.mat_W_p = self.add_weight( name = 'mat_W_p',
+                                        shape = mat_W_p_shape,
+                                        initializer = self.mat_W_p_initializer)
+
+        self.vec_b_p = self.add_weight( name = 'vec_b_p',
+                                        shape = vec_b_p_shape,
+                                        initializer = self.vec_b_p_initializer)
+        self.vec_b_p = K.tile( self.vec_b_p, ( batch_size, 1) )
+
+        self.mat_W_i = self.add_weight( name = 'mat_W_i',
+                                        shape = mat_W_i_shape,
+                                        initializer = self.mat_W_i_initializer)
+
+        self.vec_b_i = self.add_weight( name = 'vec_b_i',
+                                        shape = vec_b_i_shape,
+                                        initializer = self.vec_b_i_initializer)
+        self.vec_b_i = K.tile( self.vec_b_i, ( batch_size, 1) )
+
         self.mat_W_d = self.add_weight( name = 'mat_W_d',
-                                        shape = self.mat_W_d_shape,
+                                        shape = mat_W_d_shape,
                                         initializer = self.mat_W_d_initializer)
+
         self.vec_b_d = self.add_weight( name = 'vec_b_d',
-                                        shape = self.vec_b_d_shape,
+                                        shape = vec_b_d_shape,
                                         initializer = self.vec_b_d_initializer)
+        self.vec_b_d = K.tile( self.vec_b_d, ( batch_size, 1) )
 
         initial_state_shape = ( batch_size, self.units)
         self.initial_state  = K.zeros( initial_state_shape)
