@@ -280,7 +280,7 @@ class CassianModel :
                            show_shapes = True, to_file = filename)
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-    def train_on_dataset( self, epochs = 1, patience = 40, workers = 4) :
+    def train_on_dataset( self, epochs = 1, patience = 60, workers = 4) :
 
         print( 'Current task: Training for ' + str(epochs) + ' epochs' )
 
@@ -333,11 +333,11 @@ class CassianModel :
         ensure_directory(self.tb_log_dir)
 
         callbacks = [ ModelCheckpoint( self.weights_file,
-                                       monitor = 'val_Sold_mean_absolute_error',
+                                       monitor = 'val_Sold_root_mean_squared_error',
                                        mode = 'min',
                                        save_weights_only = True,
                                        save_best_only = True),
-                      EarlyStopping( monitor = 'Sold_mean_absolute_error',
+                      EarlyStopping( monitor = 'Sold_root_mean_squared_error',
                                      patience = patience, mode = 'min'),
                       TensorBoard( log_dir = self.tb_log_dir, write_graph = False) ]
 
