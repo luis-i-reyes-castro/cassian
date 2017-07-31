@@ -194,18 +194,18 @@ class CassianModel :
         self.output_file = self.output_file.replace( '[STORE-ID]', str(self.store_id))
         self.output_file = self.output_file.replace( '[TIMESTAMP]', self.timestamp)
         self.output_file = self.output_file.replace( '[REGULARIZATION]',
-                                                     self.regularization)
+                                                     str(self.regularization))
 
         self.weights_file = self.OUTPUT_DIR + self.WEIGHTS_FILE
         self.weights_file = self.weights_file.replace( '[STORE-ID]', str(self.store_id))
         self.weights_file = self.weights_file.replace( '[TIMESTAMP]', self.timestamp)
         self.weights_file = self.weights_file.replace( '[REGULARIZATION]',
-                                                       self.regularization)
+                                                       str(self.regularization))
 
         self.tb_log_dir = self.TB_LOG_DIR.replace( '[STORE-ID]', str(self.store_id))
         self.tb_log_dir = self.tb_log_dir.replace( '[TIMESTAMP]', self.timestamp)
         self.tb_log_dir = self.tb_log_dir.replace( '[REGULARIZATION]',
-                                                   self.regularization)
+                                                   str(self.regularization))
 
         return
 
