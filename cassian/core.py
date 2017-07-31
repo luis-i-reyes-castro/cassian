@@ -33,31 +33,39 @@ SOFTWARE.
 import numpy as np
 from keras import backend as K
 from keras.engine import Layer, InputSpec
-from keras import initializers, regularizers
+from keras import activations, initializers, regularizers
 
 # =====================================================================================
-class HybridUnit ( Layer ) :
+class NonlinearPID ( Layer ) :
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     def __init__( self, units,
+                  activation = 'softsign',
                   stateful = False,
                   return_sequences = False,
                   go_backwards = False,
                   unroll = False,
-                  mat_A_s_initializer = 'glorot_uniform',
-                  vec_b_s_initializer = 'zero',
-                  mat_A_0_initializer = 'glorot_uniform',
+                  mat_R_z_initializer = 'glorot_uniform',
+                  mat_R_z_regularizer = None,
+                  vec_b_z_initializer = 'zero',
+                  vec_b_z_regularizer = None,
+                  mat_R_0_initializer = 'glorot_uniform',
+                  mat_R_0_regularizer = None,
                   vec_b_0_initializer = 'zero',
+                  vec_b_0_regularizer = None,
                   mat_W_p_initializer = 'glorot_uniform',
+                  mat_W_p_regularizer = None,
                   vec_b_p_initializer = 'zero',
+                  vec_b_p_regularizer = None,
                   mat_W_i_initializer = 'glorot_uniform',
-                  vec_b_i_initializer = 'zero',
+                  mat_W_i_regularizer = None,
                   mat_W_d_initializer = 'glorot_uniform',
-                  vec_b_d_initializer = 'zero',
-                  activity_reg = None,
-                  vector_dropout = 0., input_dropout = 0., **kwargs) :
+                  mat_W_d_regularizer = None,
+                  activity_regulizer = None,
+                  dropout_u = 0.,
+                  dropout_x = 0., **kwargs ) :
 
-        super( HybridUnit, self).__init__(**kwargs)
+        super( NonlinearPID, self).__init__(**kwargs)
 
         self.units            = units
         self.stateful         = stateful
@@ -69,25 +77,32 @@ class HybridUnit ( Layer ) :
         self.input_spec = [ InputSpec( ndim = 2), InputSpec( ndim = 3) ]
         self.state_spec = InputSpec( ndim = 2)
 
-        self.main_activation = lambda x : K.softsign(x)
-        self.gate_activation = lambda x : 0.5 + 0.5 * K.softsign( 2.0 * x )
+        self.activation = activations.get(activation)
 
-        self.mat_A_s_initializer = initializers.get(mat_A_s_initializer)
-        self.vec_b_s_initializer = initializers.get(vec_b_s_initializer)
-        self.mat_A_0_initializer = initializers.get(mat_A_0_initializer)
+        self.mat_R_z_initializer = initializers.get(mat_R_z_initializer)
+        self.mat_R_z_regularizer = regularizers.get(mat_R_z_regularizer)
+        self.vec_b_z_initializer = initializers.get(vec_b_z_initializer)
+        self.vec_b_z_regularizer = regularizers.get(vec_b_z_regularizer)
+
+        self.mat_R_0_initializer = initializers.get(mat_R_0_initializer)
+        self.mat_R_0_regularizer = regularizers.get(mat_R_0_regularizer)
         self.vec_b_0_initializer = initializers.get(vec_b_0_initializer)
+        self.vec_b_0_regularizer = regularizers.get(vec_b_0_regularizer)
 
         self.mat_W_p_initializer = initializers.get(mat_W_p_initializer)
+        self.mat_W_p_regularizer = regularizers.get(mat_W_p_regularizer)
         self.vec_b_p_initializer = initializers.get(vec_b_p_initializer)
+        self.vec_b_p_regularizer = regularizers.get(vec_b_p_regularizer)
+
         self.mat_W_i_initializer = initializers.get(mat_W_i_initializer)
-        self.vec_b_i_initializer = initializers.get(vec_b_i_initializer)
+        self.mat_W_i_regularizer = regularizers.get(mat_W_i_regularizer)
         self.mat_W_d_initializer = initializers.get(mat_W_d_initializer)
-        self.vec_b_d_initializer = initializers.get(vec_b_d_initializer)
+        self.mat_W_d_regularizer = regularizers.get(mat_W_d_regularizer)
 
-        self.activity_regularizer = regularizers.get( activity_reg)
+        self.activity_regularizer = regularizers.get(activity_regulizer)
 
-        self.vector_dropout = min( 1., max( 0., vector_dropout) )
-        self.input_dropout  = min( 1., max( 0., input_dropout) )
+        self.dropout_u = min( 1., max( 0., dropout_u) )
+        self.dropout_x = min( 1., max( 0., dropout_x) )
 
         return
 
@@ -104,17 +119,17 @@ class HybridUnit ( Layer ) :
 
         self.check_inputs( input_shape)
 
-        vector_input_shape     = input_shape[0]
-        batch_size             = vector_input_shape[0]
-        timeseries_input_shape = input_shape[1]
-        timesteps              = timeseries_input_shape[1]
+        U_input_shape = input_shape[0]
+        X_input_shape = input_shape[1]
+        batch_size    = U_input_shape[0]
+        timesteps     = X_input_shape[1]
 
+        if batch_size != X_input_shape[0] :
+            raise ValueError( 'Batch size of vector and timeseries inputs ' +
+                              'must match (i.e., must be the same).' )
         if batch_size is None :
             raise ValueError( 'This layer is learning an initial state and so ' +
                               'it needs to know its batch size.' )
-        if vector_input_shape[0] != timeseries_input_shape[0] :
-            raise ValueError( 'Batch size of vector and timeseries inputs ' +
-                              'must match (i.e., must be the same).' )
 
         if self.return_sequences :
             return ( batch_size, timesteps, self.units)
@@ -126,92 +141,79 @@ class HybridUnit ( Layer ) :
 
         self.check_inputs( input_shape)
 
-        vec_input_shape = input_shape[0]
-        batch_size      = vec_input_shape[0]
-        vec_input_dim   = vec_input_shape[1]
+        U_input_shape = input_shape[0]
+        X_input_shape = input_shape[1]
 
-        ts_input_shape  = input_shape[1]
-        timesteps       = ts_input_shape[1]
-        ts_input_dim    = ts_input_shape[2]
+        batch_size = U_input_shape[0]
+        timesteps  = X_input_shape[1]
+        U_dim      = U_input_shape[1]
+        X_dim      = X_input_shape[2]
 
         if batch_size is None :
             raise ValueError( 'This layer is learning an initial state and so ' +
                               'it needs to know its batch size.' )
-        elif batch_size != ts_input_shape[0] :
-            raise ValueError( 'Batch size of vector and timeseries inputs ' +
+        elif batch_size != X_input_shape[0] :
+            raise ValueError( 'Batch size of static and dynamic inputs ' +
                               'must match (i.e., must be the same).' )
 
-        self.input_spec = [ InputSpec( shape = ( batch_size, vec_input_dim) ),
-                            InputSpec( shape = ( batch_size, timesteps, ts_input_dim) ) ]
+        self.input_spec = [ InputSpec( shape = ( batch_size, U_dim) ),
+                            InputSpec( shape = ( batch_size, timesteps, X_dim) ) ]
         self.state_spec =   InputSpec( shape = ( batch_size, self.units) )
 
-        mat_A_s_shape = ( vec_input_dim, self.units)
-        vec_b_s_shape = ( 1, self.units)
-        mat_A_0_shape = ( vec_input_dim, self.units)
-        vec_b_0_shape = ( 1, self.units)
+        self.mat_R_z = self.add_weight( name = 'mat_R_z',
+                                        shape = ( U_dim, 3 * self.units),
+                                        initializer = self.mat_R_z_initializer,
+                                        regularizer = self.mat_R_z_regularizer)
 
-        self.mat_A_s = self.add_weight( name = 'mat_A_s',
-                                        shape = mat_A_s_shape,
-                                        initializer = self.mat_A_s_initializer)
+        self.vec_b_z = self.add_weight( name = 'vec_b_z',
+                                        shape = ( 1, 3 * self.units),
+                                        initializer = self.vec_b_z_initializer,
+                                        regularizer = self.vec_b_z_regularizer)
+        self.vec_b_z = K.tile( self.vec_b_z, ( batch_size, 1) )
 
-        self.vec_b_s = self.add_weight( name = 'vec_b_s',
-                                        shape = vec_b_s_shape,
-                                        initializer = self.vec_b_s_initializer)
-        self.vec_b_s = K.tile( self.vec_b_s, ( batch_size, 1) )
-
-        self.mat_A_0 = self.add_weight( name = 'mat_A_0',
-                                        shape = mat_A_0_shape,
-                                        initializer = self.mat_A_0_initializer)
+        self.mat_R_0 = self.add_weight( name = 'mat_R_0',
+                                        shape = ( U_dim, self.units + X_dim),
+                                        initializer = self.mat_R_0_initializer,
+                                        regularizer = self.mat_R_0_regularizer)
 
         self.vec_b_0 = self.add_weight( name = 'vec_b_0',
-                                        shape = vec_b_0_shape,
-                                        initializer = self.vec_b_0_initializer)
+                                        shape = ( 1, self.units + X_dim),
+                                        initializer = self.vec_b_0_initializer,
+                                        regularizer = self.vec_b_0_regularizer)
         self.vec_b_0 = K.tile( self.vec_b_0, ( batch_size, 1) )
 
-        mat_W_p_shape = ( ts_input_dim, self.units)
-        vec_b_p_shape = ( 1, self.units)
-        mat_W_i_shape = ( ts_input_dim, self.units)
-        vec_b_i_shape = ( 1, self.units)
-        mat_W_d_shape = ( ts_input_dim, self.units)
-        vec_b_d_shape = ( 1, self.units)
-
         self.mat_W_p = self.add_weight( name = 'mat_W_p',
-                                        shape = mat_W_p_shape,
-                                        initializer = self.mat_W_p_initializer)
+                                        shape = ( X_dim, self.units),
+                                        initializer = self.mat_W_p_initializer,
+                                        regularizer = self.mat_W_p_regularizer)
 
         self.vec_b_p = self.add_weight( name = 'vec_b_p',
-                                        shape = vec_b_p_shape,
-                                        initializer = self.vec_b_p_initializer)
+                                        shape = ( 1, self.units),
+                                        initializer = self.vec_b_p_initializer,
+                                        regularizer = self.vec_b_p_regularizer)
         self.vec_b_p = K.tile( self.vec_b_p, ( batch_size, 1) )
 
         self.mat_W_i = self.add_weight( name = 'mat_W_i',
-                                        shape = mat_W_i_shape,
-                                        initializer = self.mat_W_i_initializer)
-
-        self.vec_b_i = self.add_weight( name = 'vec_b_i',
-                                        shape = vec_b_i_shape,
-                                        initializer = self.vec_b_i_initializer)
-        self.vec_b_i = K.tile( self.vec_b_i, ( batch_size, 1) )
+                                        shape = ( X_dim, self.units),
+                                        initializer = self.mat_W_i_initializer,
+                                        regularizer = self.mat_W_i_regularizer)
 
         self.mat_W_d = self.add_weight( name = 'mat_W_d',
-                                        shape = mat_W_d_shape,
-                                        initializer = self.mat_W_d_initializer)
+                                        shape = ( X_dim, self.units),
+                                        initializer = self.mat_W_d_initializer,
+                                        regularizer = self.mat_W_d_regularizer)
 
-        self.vec_b_d = self.add_weight( name = 'vec_b_d',
-                                        shape = vec_b_d_shape,
-                                        initializer = self.vec_b_d_initializer)
-        self.vec_b_d = K.tile( self.vec_b_d, ( batch_size, 1) )
-
-        initial_state_shape = ( batch_size, self.units)
-        self.initial_state  = K.zeros( initial_state_shape)
+        self.initial_i = K.zeros( ( batch_size, self.units) )
+        self.initial_x = K.zeros( ( batch_size, X_dim) )
 
         if self.stateful :
-            self.states = [ K.zeros( initial_state_shape) ]
+            self.states = [ K.zeros_like(self.initial_i),
+                            K.zeros_like(self.initial_x) ]
             self.reset_states()
         else :
-            self.states = [ None ]
+            self.states = [ None, None ]
 
-        super( HybridUnit, self).build( input_shape)
+        super( NonlinearPID, self).build( input_shape)
 
         return
 
@@ -220,7 +222,7 @@ class HybridUnit ( Layer ) :
 
         self.check_inputs( inputs)
 
-        return super( HybridUnit, self).__call__( inputs, **kwargs)
+        return super( NonlinearPID, self).__call__( inputs, **kwargs)
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     def call( self, inputs, mask = None, training = None) :
@@ -228,71 +230,93 @@ class HybridUnit ( Layer ) :
         # -----------------------------------------------------------------------------
         self.check_inputs( inputs)
 
-        X_vecs = inputs[0] # shape = ( batch_size, vec_input_dim)
-        X_ts   = inputs[1] # shape = ( batch_size, timesteps, ts_input_dim)
+        U_vecs = inputs[0] # shape = ( batch_size, U_dim)
+        X_vecs = inputs[1] # shape = ( batch_size, timesteps, X_dim)
 
-        if K.int_shape( X_vecs)[0] != K.int_shape( X_ts)[0] :
-            raise ValueError( 'Batch size of vector and timeseries inputs ' +
+        if K.int_shape( U_vecs)[0] != K.int_shape( X_vecs)[0] :
+            raise ValueError( 'Batch size of static and dynamic inputs ' +
                               'must match (i.e., must be the same).' )
-        if self.unroll and K.int_shape( X_ts)[1] is None :
-            raise ValueError( 'Cannot unroll the RNN if the number of timesteps ' +
+        if self.unroll and K.int_shape( X_vecs)[1] is None :
+            raise ValueError( 'Cannot use option unroll if number of timesteps ' +
                               'is undefined.' )
 
-        # Applies dropout to the vector inputs if applicable. Regardless, at the end
-        # tensor X_vecs has shape ( batch_size, vec_input_dim).
-        if 0 < self.vector_dropout < 1 :
-            vec_input_ones = K.ones_like( X_vecs)
-            array_01s = K.dropout( vec_input_ones, self.vector_dropout)
-            X_vecs._uses_learning_phase = True
-            X_vecs = K.in_train_phase( X_vecs * array_01s, X_vecs, training)
+        # Applies dropout to the U-inputs if applicable. Regardless, at the end
+        # tensor U_vecs has shape ( batch_size, U_dim).
+        if 0 < self.dropout_u < 1 :
+            U_ones = K.ones_like( U_vecs)
+            U_mask = K.dropout( U_ones, self.dropout_u)
+            U_vecs._uses_learning_phase = True
+            U_vecs = K.in_train_phase( U_vecs * U_mask, U_vecs, training)
 
-        # Defines list of initial states. At the end H_0 is a list
-        # containing a single tensor of shape ( batch_size, units).
+        # Computes channel selectors (i.e. Z-vectors) from U-inputs, resulting in
+        # tensors Z_p, Z_i and Z_d, each with shape ( batch_size, units).
+        Z_pid = K.dot( U_vecs, self.mat_R_z) + self.vec_b_z
+        # shape = ( batch_size, 3 * units)
+        Z_pid = K.reshape( Z_pid, ( -1, self.units, 3) )
+        # shape = ( batch_size, units, 3)
+        Z_pid = K.softmax(Z_pid)
+        Z_p   = Z_pid[ :, :, 0]
+        Z_i   = Z_pid[ :, :, 1]
+        Z_d   = Z_pid[ :, :, 2]
+
+        # Builds X-inputs dropout mask if applicable
+        if 0 < self.dropout_x < 1 :
+            X_ones = K.ones_like( X_vecs[ :, 0, :] ) # shp = ( batch, X_dim)
+            X_mask = K.dropout( X_ones, self.dropout_x)
+            X_mask = K.in_train_phase( X_mask, X_ones, training)
+
+        # Defines list of initial states. At the end list_of_initial_states
+        # contains two tensors: the first is the initial integral term with
+        # shape ( batch_size, units); the second is the previous input with
+        # shape ( batch_size, X_dim).
         if self.stateful :
-            H_0 = self.states
+            list_of_initial_states = self.states
         else :
-            batch_size = K.shape(X_ts)[0]
-            self.initial_state += \
-            self.main_activation( K.dot( X_vecs, self.mat_W_0) \
-                                + K.tile( self.vec_b_0, ( batch_size, 1) ) )
-            H_0 = [ self.initial_state ]
+            initial_ix = K.dot( U_vecs, self.mat_R_0) + self.vec_b_0
+            # shape = ( batch_size, units + X_dim)
+            self.initial_i += initial_ix[ :, : self.units ] # shp = ( batch, units)
+            self.initial_x += initial_ix[ :, self.units : ] # shp = ( batch, X_dim)
+            list_of_initial_states = [ self.initial_i, self.initial_x ]
 
-        # Builds input dropout mask for if applicable. Regardless, at the end
-        # tensor State_dp_mask has shape ( batch_size, ts_input_dim).
-        input_ones    = K.ones_like( X_ts[ :, 0, :] )
-        Input_dp_mask = input_ones
-        if 0 < self.input_dropout < 1 :
-            array_01s = K.dropout( input_ones, self.input_dropout)
-            Input_dp_mask = K.in_train_phase( array_01s, input_ones, training)
-
-        # Precomputes feedforward terms
-        X_vecs_dot_mat_P_d = K.dot( X_vecs, self.mat_P_d)
+        # Applies dropout to the initial X-input if applicable
+        if 0 < self.dropout_x < 1 :
+            list_of_initial_states[1] *= X_mask
 
         # -----------------------------------------------------------------------------
         # For each timestep t ...
-        def rnn_recursion( X_t, list_of_H_tm1) :
+        def recursion( X_t, list_of_previous_states) :
 
-            # Input X_t is a tensor of shape ( batch_size, ts_input_dim).
-            X_t = X_t * Input_dp_mask
-            # Previous state H_{t-1} is list containing a single tensor of
-            # shape ( batch_size, units).
-            H_tm1 = list_of_H_tm1[0]
+            # Input X_t is a tensor of shape ( batch_size, X_dim)
+            if self.dropout_x :
+                X_t = X_t * X_mask
+            # List of previous states contains two tensors:
+            # Previous integral I_{t-1} with shape = ( batch_size, units);
+            # Previous input X_{t-1} with shape = ( batch_size, X_dim).
+            I_tm1 = list_of_previous_states[0]
+            X_tm1 = list_of_previous_states[1]
 
-            # Computes state update vectors; shape ( batch_size, units).
-            H_t = self.main_activation( H_tm1 \
-                                      + X_vecs_dot_mat_P_d
-                                      + K.dot( X_t, self.mat_W_d) \
-                                      + K.tile( self.vec_b_d, ( batch_size, 1) ) )
+            # Computes (P) proportional, (I) integral and (D) difference terms.
+            # Each of them has shape ( batch_size, units).
+            P_t = self.activation( X_t * self.mat_W_p + self.vec_b_p )
+            I_t = self.activation( I_tm1 + X_t * self.mat_W_i )
+            D_t = self.activation( ( X_t - X_tm1 ) * self.mat_W_d )
 
-            if 0 < self.input_dropout :
-                H_t._uses_learning_phase = True
+            # Computes output tensor, which has shape ( batch_size, units).
+            Y_t = ( Z_p * P_t ) + ( Z_i * I_t ) + ( Z_d * D_t )
+            if 0 < self.dropout_u + self.dropout_x :
+                Y_t._uses_learning_phase = True
 
-            return ( H_t, [H_t] )
+            # List of current states contains two tensors:
+            # Current integral I_t with shape = ( batch_size, units);
+            # Current input X_t with shape = ( batch_size, X_dim).
+            list_of_states = [ I_t, X_t ]
+
+            return ( Y_t, list_of_states)
 
         # -----------------------------------------------------------------------------
-        last_output, outputs, states = K.rnn( step_function = rnn_recursion,
-                                              inputs = X_ts,
-                                              initial_states = H_0,
+        last_output, outputs, states = K.rnn( step_function = recursion,
+                                              inputs = X_vecs,
+                                              initial_states = list_of_initial_states,
                                               mask = mask,
                                               go_backwards = self.go_backwards,
                                               unroll = self.unroll)
@@ -301,7 +325,7 @@ class HybridUnit ( Layer ) :
             updates = [ ( self.states[0], states[0]) ]
             self.add_update( updates, inputs)
 
-        if 0 < self.input_dropout :
+        if 0 < self.dropout_u + self.dropout_x :
             last_output._uses_learning_phase = True
             outputs._uses_learning_phase = True
 
@@ -311,28 +335,29 @@ class HybridUnit ( Layer ) :
         return last_output
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-    def compute_and_set_initial_states( self, X_vectors) :
+    def compute_and_set_initial_states( self, U_vecs) :
 
         if not self.stateful :
             raise AttributeError( 'Layer must be stateful.' )
 
-        if not isinstance( X_vectors, np.ndarray) :
-            raise ValueError( 'Parameter X_vectors must be a numpy array.' )
+        if not isinstance( U_vecs, np.ndarray) :
+            raise ValueError( 'Parameter U_vecs must be a numpy array.' )
 
-        batch_size       = self.input_spec[0].shape[0]
-        vector_input_dim = self.input_spec[0].shape[1]
+        batch_size    = self.input_spec[0].shape[0]
+        U_dim         = self.input_spec[0].shape[1]
+        correct_shape = ( batch_size, U_dim)
 
-        if X_vectors.shape != ( batch_size, vector_input_dim) :
-            raise ValueError( 'Expected X_vectors parameter to have shape ' +
-                              str( ( batch_size, vector_input_dim) ) +
-                              ' but got passed an array of shape ' +
-                              str( X_vectors.shape ) + '.' )
+        if U_vecs.shape != correct_shape :
+            raise ValueError( 'Expected U_vecs parameter to have shape ' +
+                              str(correct_shape) + ' but got passed an array ' +
+                              'of shape ' + str( U_vecs.shape ) + '.' )
 
-        H_0 = np.dot( X_vectors, K.get_value( self.mat_W_0) ) \
-            + np.tile( K.get_value( self.vec_b_0), ( batch_size, 1) )
-        H_0 = H_0 / ( 1 + np.abs( H_0 ) )
+        initial_ix = np.dot( U_vecs, K.get_value(self.mat_R_0) ) \
+                   + K.get_value( self.vec_b_0)
 
-        K.set_value( self.initial_state, H_0)
+        K.set_value( self.initial_i, initial_ix[ :, : self.units ] )
+        K.set_value( self.initial_x, initial_ix[ :, self.units : ] )
+
         self.reset_states()
 
         return
@@ -343,7 +368,8 @@ class HybridUnit ( Layer ) :
         if not self.stateful :
             raise AttributeError( 'Layer must be stateful.' )
 
-        K.set_value( self.states[0], K.get_value( self.initial_state) )
+        K.set_value( self.states[0], K.get_value(self.initial_i) )
+        K.set_value( self.states[1], K.get_value(self.initial_x) )
 
         return
 
@@ -358,14 +384,15 @@ class HybridUnit ( Layer ) :
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     def get_config(self) :
 
-        base_config = super( HybridUnit, self).get_config()
+        base_config = super( NonlinearPID, self).get_config()
 
         config = { 'units' : self.units,
+                   'activation' : self.activation,
                    'stateful': self.stateful,
                    'return_sequences' : self.return_sequences,
                    'go_backwards' : self.go_backwards,
                    'unroll': self.unroll,
-                   'vector_dropout' : self.vector_dropout,
-                   'input_dropout' : self.input_dropout }
+                   'dropout_u' : self.dropout_u,
+                   'dropout_x' : self.dropout_x }
 
         return dict( list( base_config.items() ) + list( config.items() ) )

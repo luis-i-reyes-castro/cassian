@@ -20,7 +20,7 @@ from keras.utils.vis_utils import plot_model
 
 from .data_management import Dataset
 from .batching import BatchSpecifications, BatchSample
-from .core import HybridUnit
+from .core import NonlinearPID
 from .convenience import exists_file, ensure_directory
 from .convenience import serialize, de_serialize
 from .convenience import get_timestamp, move_date
@@ -41,7 +41,7 @@ class CassianModel :
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     def __init__( self, dataset_filename, batch_size, timesteps,
                         dense_layer_sizes = [],
-                        SGHU_layer_sizes = [ 512 ] ) :
+                        NLPID_layer_sizes = [ 256, 256] ) :
 
         print( 'Current task: Loading Dataset instance' )
         if not exists_file( dataset_filename) :
@@ -57,7 +57,7 @@ class CassianModel :
         self.batch_size        = batch_size
         self.timesteps         = timesteps
         self.dense_layer_sizes = dense_layer_sizes
-        self.SGHU_layer_sizes  = SGHU_layer_sizes
+        self.NLPID_layer_sizes = NLPID_layer_sizes
 
         self.outputs_list   = []
         self.loss_functions = {}
@@ -88,10 +88,10 @@ class CassianModel :
 
         last_output_ts = X_ts
 
-        for ( i, layer_size) in enumerate( self.SGHU_layer_sizes) :
-            layer_name = 'SingleGateHybridUnit-'+ str(i+1)
-            layer = HybridUnit( name = layer_name, units = layer_size,
-                                return_sequences = True)
+        for ( i, layer_size) in enumerate( self.NLPID_layer_sizes) :
+            layer_name = 'NonlinearPID-'+ str(i+1)
+            layer = NonlinearPID( name = layer_name, units = layer_size,
+                                  return_sequences = True )
             last_output_ts = layer( [ last_output_vector, last_output_ts] )
             # shape = ( batch_size, None, layer_dim)
 
@@ -114,7 +114,7 @@ class CassianModel :
             zip( dense_layer_names, layer_names, layer_activations, layer_losses) :
 
             dense_layer = Dense( name = dense_layer_name,
-                                 input_dim = self.SGHU_layer_sizes[-1],
+                                 input_dim = self.NLPID_layer_sizes[-1],
                                  units = 1,
                                  activation = layer_activation)
 
@@ -142,7 +142,7 @@ class CassianModel :
             zip( dense_layer_names, layer_names, layer_dims) :
 
             dense_layer = Dense( name = dense_layer_name,
-                                 input_dim = self.SGHU_layer_sizes[-1],
+                                 input_dim = self.NLPID_layer_sizes[-1],
                                  units = layer_dim,
                                  activation = 'softmax')
 
@@ -209,7 +209,7 @@ class CassianModel :
         output_dict['batch_size']        = self.batch_size
         output_dict['timesteps']         = self.timesteps
         output_dict['dense_layer_sizes'] = self.dense_layer_sizes
-        output_dict['SGHU_layer_sizes']  = self.SGHU_layer_sizes
+        output_dict['NLPID_layer_sizes'] = self.NLPID_layer_sizes
         output_dict['weights_filename']  = self.weights_file
 
         print( 'Saving CassianModel instance to file:', self.output_file)
@@ -239,7 +239,7 @@ class CassianModel :
                                 input_dict['batch_size'],
                                 input_dict['timesteps'],
                                 input_dict['dense_layer_sizes'],
-                                input_dict['SGHU_layer_sizes'] )
+                                input_dict['NLPID_layer_sizes'] )
 
         cassian.model.load_weights( input_dict['weights_filename'] )
 
