@@ -89,7 +89,7 @@ def main( argv) :
             timesteps = max( ( timesteps, int(arg) ) )
         if opt in ( '-w', '--workers') :
             workers = max( ( 2, int(arg) ) )
-        if opt in ( '-R', '--regularize') :
+        if opt in ( '-R', '--regularization') :
             regularize = max( ( 0.0, float(arg) ) )
         if opt in ( '-L', '--learning-rate') :
             learn_rate = max( ( 1E-5, float(arg) ) )
