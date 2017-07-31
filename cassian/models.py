@@ -31,12 +31,12 @@ class CassianModel :
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     OUTPUT_DIR   = 'trained-models/'
-    OUTPUT_FILE  = 'store-[STORE-ID]_model_[TIMESTAMP].pkl'
-    WEIGHTS_FILE = 'store-[STORE-ID]_weights_[TIMESTAMP].h5'
+    OUTPUT_FILE  = 'store-[STORE-ID]_model_[TIMESTAMP]_R-[REGULARIZATION].pkl'
+    WEIGHTS_FILE = 'store-[STORE-ID]_weights_[TIMESTAMP]_R-[REGULARIZATION].h5'
     RESULTS_DIR  = 'results/'
     RESULTS_FILE = 'store-[STORE-ID]_results.pkl'
     SUMMARY_FILE = 'store-[STORE-ID]_summary.xlsx'
-    TB_LOG_DIR   = 'tensorboard-logs/store-[STORE-ID]/[TIMESTAMP]'
+    TB_LOG_DIR   = 'tensorboard-logs/' + OUTPUT_FILE
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     def __init__( self, dataset_filename, batch_size,
@@ -170,7 +170,11 @@ class CassianModel :
 
         # -----------------------------------------------------------------------------
         self.validation_metrics                = {}
-        self.validation_metrics['Sold']        = 'mae'
+
+        def root_mean_squared_error( y_true, y_pred) :
+            return K.sqrt( K.mean( K.square(y_pred - y_true), axis=-1) )
+
+        self.validation_metrics['Sold']        = root_mean_squared_error
         self.validation_metrics['Is_On_Sale']  = 'accuracy'
         self.validation_metrics['Replenished'] = 'categorical_accuracy'
         self.validation_metrics['Returned']    = 'categorical_accuracy'
@@ -189,13 +193,19 @@ class CassianModel :
         self.output_file = self.OUTPUT_DIR + self.OUTPUT_FILE
         self.output_file = self.output_file.replace( '[STORE-ID]', str(self.store_id))
         self.output_file = self.output_file.replace( '[TIMESTAMP]', self.timestamp)
+        self.output_file = self.output_file.replace( '[REGULARIZATION]',
+                                                     self.regularization)
 
         self.weights_file = self.OUTPUT_DIR + self.WEIGHTS_FILE
         self.weights_file = self.weights_file.replace( '[STORE-ID]', str(self.store_id))
         self.weights_file = self.weights_file.replace( '[TIMESTAMP]', self.timestamp)
+        self.weights_file = self.weights_file.replace( '[REGULARIZATION]',
+                                                       self.regularization)
 
         self.tb_log_dir = self.TB_LOG_DIR.replace( '[STORE-ID]', str(self.store_id))
         self.tb_log_dir = self.tb_log_dir.replace( '[TIMESTAMP]', self.timestamp)
+        self.tb_log_dir = self.tb_log_dir.replace( '[REGULARIZATION]',
+                                                   self.regularization)
 
         return
 
