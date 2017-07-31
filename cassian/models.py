@@ -14,7 +14,7 @@ from keras import backend as K
 from keras.layers import Input, Dense
 from keras.layers.wrappers import TimeDistributed
 from keras.models import Model
-from keras import optimizers
+from keras import regularizers, optimizers
 from keras.callbacks import ModelCheckpoint, EarlyStopping, TensorBoard
 from keras.utils.vis_utils import plot_model
 
@@ -39,9 +39,13 @@ class CassianModel :
     TB_LOG_DIR   = 'tensorboard-logs/store-[STORE-ID]/[TIMESTAMP]'
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-    def __init__( self, dataset_filename, batch_size, timesteps,
+    def __init__( self, dataset_filename, batch_size,
+                        timesteps = 90,
                         dense_layer_sizes = [],
-                        NLPID_layer_sizes = [ 256, 256] ) :
+                        NLPID_layer_sizes = [ 256, 256],
+                        regularization = 1E-4,
+                        algorithm = 'Adam',
+                        learning_rate = 0.002 ) :
 
         print( 'Current task: Loading Dataset instance' )
         if not exists_file( dataset_filename) :
@@ -58,7 +62,10 @@ class CassianModel :
         self.timesteps         = timesteps
         self.dense_layer_sizes = dense_layer_sizes
         self.NLPID_layer_sizes = NLPID_layer_sizes
+        self.regularization    = regularization
+        self.learning_rate     = learning_rate
 
+        self.regularizer    = lambda : regularizers.l1(regularization)
         self.outputs_list   = []
         self.loss_functions = {}
 
@@ -90,8 +97,15 @@ class CassianModel :
 
         for ( i, layer_size) in enumerate( self.NLPID_layer_sizes) :
             layer_name = 'NonlinearPID-'+ str(i+1)
-            layer = NonlinearPID( name = layer_name, units = layer_size,
-                                  return_sequences = True )
+            layer = NonlinearPID( name = layer_name,
+                                  units = layer_size,
+                                  return_sequences = True,
+                                  mat_R_z_regularizer = self.regularizer(),
+                                  mat_R_0_regularizer = self.regularizer(),
+                                  mat_W_p_regularizer = self.regularizer(),
+                                  vec_b_p_regularizer = self.regularizer(),
+                                  mat_W_i_regularizer = self.regularizer(),
+                                  mat_W_d_regularizer = self.regularizer() )
             last_output_ts = layer( [ last_output_vector, last_output_ts] )
             # shape = ( batch_size, None, layer_dim)
 
@@ -116,7 +130,8 @@ class CassianModel :
             dense_layer = Dense( name = dense_layer_name,
                                  input_dim = self.NLPID_layer_sizes[-1],
                                  units = 1,
-                                 activation = layer_activation)
+                                 activation = layer_activation,
+                                 kernel_regularizer = self.regularizer() )
 
             output_tensor = \
             TimeDistributed( name = layer_name, layer = dense_layer)( last_output_ts )
@@ -144,7 +159,8 @@ class CassianModel :
             dense_layer = Dense( name = dense_layer_name,
                                  input_dim = self.NLPID_layer_sizes[-1],
                                  units = layer_dim,
-                                 activation = 'softmax')
+                                 activation = 'softmax',
+                                 kernel_regularizer = self.regularizer() )
 
             output_tensor = \
             TimeDistributed( name = layer_name, layer = dense_layer)( last_output_ts )
@@ -186,11 +202,11 @@ class CassianModel :
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     def compile_model( self) :
 
-#        self.optimizer = optimizers.SGD( lr = 1E-4,
+#        self.optimizer = optimizers.SGD( lr = self.learning_rate,
 #                                         momentum = 0.9,
 #                                         nesterov = True )
 
-        self.optimizer = optimizers.Adam( lr = 0.001,
+        self.optimizer = optimizers.Adam( lr = self.learning_rate,
                                           beta_1 = 0.9,
                                           beta_2 = 0.99,
                                           epsilon = 1E-6 )
