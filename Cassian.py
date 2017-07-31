@@ -28,7 +28,7 @@ def main( argv) :
     opts_short = 'hls:fTl:e:b:t:w:R:L:Pp:'
     opts_long  = [ 'help', 'list', 'store=',
                    'fetch', 'build-dataset_only', 'train', 'load=',
-                   'epochs=', 'batch_size=', 'timesteps=', 'workers=',
+                   'epochs=', 'batch-size=', 'timesteps=', 'workers=',
                    'regularization=', 'learning-rate=',
                    'predict', 'plot=' ]
 
