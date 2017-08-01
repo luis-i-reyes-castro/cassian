@@ -102,8 +102,8 @@ class CassianModel :
                                   return_sequences = True,
                                   mat_R_z_regularizer = self.regularizer(),
                                   mat_R_0_regularizer = self.regularizer(),
+                                  mat_R_b_regularizer = self.regularizer(),
                                   mat_W_p_regularizer = self.regularizer(),
-                                  vec_b_p_regularizer = self.regularizer(),
                                   mat_W_i_regularizer = self.regularizer(),
                                   mat_W_d_regularizer = self.regularizer() )
             last_output_ts = layer( [ last_output_vector, last_output_ts] )
@@ -131,7 +131,8 @@ class CassianModel :
                                  input_dim = self.NLPID_layer_sizes[-1],
                                  units = 1,
                                  activation = layer_activation,
-                                 kernel_regularizer = self.regularizer() )
+                                 kernel_regularizer = self.regularizer(),
+                                 use_bias = False )
 
             output_tensor = \
             TimeDistributed( name = layer_name, layer = dense_layer)( last_output_ts )
@@ -160,27 +161,14 @@ class CassianModel :
                                  input_dim = self.NLPID_layer_sizes[-1],
                                  units = layer_dim,
                                  activation = 'softmax',
-                                 kernel_regularizer = self.regularizer() )
+                                 kernel_regularizer = self.regularizer(),
+                                 use_bias = False )
 
             output_tensor = \
             TimeDistributed( name = layer_name, layer = dense_layer)( last_output_ts )
 
             self.outputs_list.append( output_tensor)
             self.loss_functions[layer_name] = layer_losses
-
-        # -----------------------------------------------------------------------------
-        self.validation_metrics                = {}
-
-        def root_mean_squared_error( y_true, y_pred) :
-            return K.sqrt( K.mean( K.square(y_pred - y_true), axis=-1) )
-
-        self.validation_metrics['Sold']        = root_mean_squared_error
-        self.validation_metrics['Is_On_Sale']  = 'accuracy'
-        self.validation_metrics['Replenished'] = 'categorical_accuracy'
-        self.validation_metrics['Returned']    = 'categorical_accuracy'
-        self.validation_metrics['Trashed']     = 'categorical_accuracy'
-        self.validation_metrics['Found']       = 'categorical_accuracy'
-        self.validation_metrics['Missing']     = 'categorical_accuracy'
 
         # -----------------------------------------------------------------------------
         self.model = Model( inputs = [ X_vecs, X_ts],
@@ -212,14 +200,23 @@ class CassianModel :
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     def compile_model( self) :
 
-#        self.optimizer = optimizers.SGD( lr = self.learning_rate,
-#                                         momentum = 0.9,
-#                                         nesterov = True )
+        self.validation_metrics = {}
+
+        def root_mean_squared_error( y_true, y_pred) :
+            return K.sqrt( K.mean( K.square(y_pred - y_true), axis=-1) )
+
+        self.validation_metrics['Sold']        = root_mean_squared_error
+        self.validation_metrics['Is_On_Sale']  = 'accuracy'
+        self.validation_metrics['Replenished'] = 'categorical_accuracy'
+        self.validation_metrics['Returned']    = 'categorical_accuracy'
+        self.validation_metrics['Trashed']     = 'categorical_accuracy'
+        self.validation_metrics['Found']       = 'categorical_accuracy'
+        self.validation_metrics['Missing']     = 'categorical_accuracy'
 
         self.optimizer = optimizers.Adam( lr = self.learning_rate,
                                           beta_1 = 0.9,
-                                          beta_2 = 0.99,
-                                          epsilon = 1E-6 )
+                                          beta_2 = 0.998,
+                                          epsilon = 1E-7 )
 
         self.model.compile( optimizer = self.optimizer,
                             loss = self.loss_functions,
