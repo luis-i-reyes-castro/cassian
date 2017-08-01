@@ -53,10 +53,10 @@ class NonlinearPID ( Layer ) :
                   mat_R_0_regularizer = None,
                   vec_b_0_initializer = 'zero',
                   vec_b_0_regularizer = None,
+                  mat_R_b_initializer = 'glorot_uniform',
+                  mat_R_b_regularizer = None,
                   mat_W_p_initializer = 'glorot_uniform',
                   mat_W_p_regularizer = None,
-                  vec_b_p_initializer = 'zero',
-                  vec_b_p_regularizer = None,
                   mat_W_i_initializer = 'glorot_uniform',
                   mat_W_i_regularizer = None,
                   mat_W_d_initializer = 'glorot_uniform',
@@ -89,10 +89,11 @@ class NonlinearPID ( Layer ) :
         self.vec_b_0_initializer = initializers.get(vec_b_0_initializer)
         self.vec_b_0_regularizer = regularizers.get(vec_b_0_regularizer)
 
+        self.mat_R_b_initializer = initializers.get(mat_R_b_initializer)
+        self.mat_R_b_regularizer = regularizers.get(mat_R_b_regularizer)
+
         self.mat_W_p_initializer = initializers.get(mat_W_p_initializer)
         self.mat_W_p_regularizer = regularizers.get(mat_W_p_regularizer)
-        self.vec_b_p_initializer = initializers.get(vec_b_p_initializer)
-        self.vec_b_p_regularizer = regularizers.get(vec_b_p_regularizer)
 
         self.mat_W_i_initializer = initializers.get(mat_W_i_initializer)
         self.mat_W_i_regularizer = regularizers.get(mat_W_i_regularizer)
@@ -182,16 +183,15 @@ class NonlinearPID ( Layer ) :
                                         regularizer = self.vec_b_0_regularizer)
         self.vec_b_0 = K.tile( self.vec_b_0, ( batch_size, 1) )
 
+        self.mat_R_b = self.add_weight( name = 'mat_R_b',
+                                        shape = ( U_dim, self.units),
+                                        initializer = self.mat_R_b_initializer,
+                                        regularizer = self.mat_R_b_regularizer)
+
         self.mat_W_p = self.add_weight( name = 'mat_W_p',
                                         shape = ( X_dim, self.units),
                                         initializer = self.mat_W_p_initializer,
                                         regularizer = self.mat_W_p_regularizer)
-
-        self.vec_b_p = self.add_weight( name = 'vec_b_p',
-                                        shape = ( 1, self.units),
-                                        initializer = self.vec_b_p_initializer,
-                                        regularizer = self.vec_b_p_regularizer)
-        self.vec_b_p = K.tile( self.vec_b_p, ( batch_size, 1) )
 
         self.mat_W_i = self.add_weight( name = 'mat_W_i',
                                         shape = ( X_dim, self.units),
@@ -248,16 +248,18 @@ class NonlinearPID ( Layer ) :
             U_vecs._uses_learning_phase = True
             U_vecs = K.in_train_phase( U_vecs * U_mask, U_vecs, training)
 
+        # Computes U-input-dependent biases
+        U_bias = K.dot( U_vecs, self.mat_R_b) # shape = ( batch_size, units)
+
         # Computes channel selectors (i.e. Z-vectors) from U-inputs, resulting in
         # tensors Z_p, Z_i and Z_d, each with shape ( batch_size, units).
         Z_pid = K.dot( U_vecs, self.mat_R_z) + self.vec_b_z
         # shape = ( batch_size, 3 * units)
         Z_pid = K.reshape( Z_pid, ( -1, self.units, 3) )
         # shape = ( batch_size, units, 3)
-        Z_pid = K.softmax(Z_pid)
-        Z_p   = Z_pid[ :, :, 0]
-        Z_i   = Z_pid[ :, :, 1]
-        Z_d   = Z_pid[ :, :, 2]
+        Z_p = Z_pid[ :, :, 0]
+        Z_i = Z_pid[ :, :, 1]
+        Z_d = Z_pid[ :, :, 2]
 
         # Builds X-inputs dropout mask if applicable
         if 0 < self.dropout_x < 1 :
@@ -297,12 +299,12 @@ class NonlinearPID ( Layer ) :
 
             # Computes (P) proportional, (I) integral and (D) difference terms.
             # Each of them has shape ( batch_size, units).
-            P_t = self.activation( K.dot( X_t, self.mat_W_p) + self.vec_b_p )
+            P_t = self.activation( K.dot( X_t, self.mat_W_p) )
             I_t = self.activation( I_tm1 + K.dot( X_t, self.mat_W_i) )
             D_t = self.activation( K.dot( X_t - X_tm1, self.mat_W_d) )
 
             # Computes output tensor, which has shape ( batch_size, units).
-            Y_t = ( Z_p * P_t ) + ( Z_i * I_t ) + ( Z_d * D_t )
+            Y_t = U_bias + ( Z_p * P_t ) + ( Z_i * I_t ) + ( Z_d * D_t )
             if 0 < self.dropout_u + self.dropout_x :
                 Y_t._uses_learning_phase = True
 
