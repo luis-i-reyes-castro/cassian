@@ -224,8 +224,7 @@ class CassianModel :
 
         self.optimizer = optimizers.Adam( lr = self.learning_rate,
                                           beta_1 = 0.9,
-                                          beta_2 = 0.998,
-                                          epsilon = 1E-7 )
+                                          beta_2 = 0.99 )
 
         self.model.compile( optimizer = self.optimizer,
                             loss = self.loss_functions,
