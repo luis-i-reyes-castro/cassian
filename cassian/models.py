@@ -31,8 +31,8 @@ class CassianModel :
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     OUTPUT_DIR   = 'trained-models/'
-    OUTPUT_FILE  = 'store-[STORE-ID]_model_[TIMESTAMP]_R-[REGULARIZATION].pkl'
-    WEIGHTS_FILE = 'store-[STORE-ID]_weights_[TIMESTAMP]_R-[REGULARIZATION].h5'
+    OUTPUT_FILE  = 'store-[STORE-ID]_model_[TIME]_R-[REG]_L-[LR].pkl'
+    WEIGHTS_FILE = 'store-[STORE-ID]_weights_[TIME]_R-[REG]_L-[LR].h5'
     RESULTS_DIR  = 'results/'
     RESULTS_FILE = 'store-[STORE-ID]_results.pkl'
     SUMMARY_FILE = 'store-[STORE-ID]_summary.xlsx'
@@ -100,9 +100,6 @@ class CassianModel :
             layer = NonlinearPID( name = layer_name,
                                   units = layer_size,
                                   return_sequences = True,
-                                  mat_R_z_regularizer = self.regularizer(),
-                                  mat_R_0_regularizer = self.regularizer(),
-                                  mat_R_b_regularizer = self.regularizer(),
                                   mat_W_p_regularizer = self.regularizer(),
                                   mat_W_i_regularizer = self.regularizer(),
                                   mat_W_d_regularizer = self.regularizer() )
@@ -179,21 +176,33 @@ class CassianModel :
         ensure_directory( self.OUTPUT_DIR)
 
         self.output_file = self.OUTPUT_DIR + self.OUTPUT_FILE
-        self.output_file = self.output_file.replace( '[STORE-ID]', str(self.store_id))
-        self.output_file = self.output_file.replace( '[TIMESTAMP]', self.timestamp)
-        self.output_file = self.output_file.replace( '[REGULARIZATION]',
+        self.output_file = self.output_file.replace( '[STORE-ID]',
+                                                     str(self.store_id))
+        self.output_file = self.output_file.replace( '[TIME]',
+                                                     self.timestamp)
+        self.output_file = self.output_file.replace( '[REG]',
                                                      str(self.regularization))
+        self.output_file = self.output_file.replace( '[LR]',
+                                                     str(self.learning_rate))
 
         self.weights_file = self.OUTPUT_DIR + self.WEIGHTS_FILE
-        self.weights_file = self.weights_file.replace( '[STORE-ID]', str(self.store_id))
-        self.weights_file = self.weights_file.replace( '[TIMESTAMP]', self.timestamp)
-        self.weights_file = self.weights_file.replace( '[REGULARIZATION]',
+        self.weights_file = self.weights_file.replace( '[STORE-ID]',
+                                                       str(self.store_id))
+        self.weights_file = self.weights_file.replace( '[TIME]',
+                                                       self.timestamp)
+        self.weights_file = self.weights_file.replace( '[REG]',
                                                        str(self.regularization))
+        self.weights_file = self.weights_file.replace( '[LR]',
+                                                       str(self.learning_rate))
 
-        self.tb_log_dir = self.TB_LOG_DIR.replace( '[STORE-ID]', str(self.store_id))
-        self.tb_log_dir = self.tb_log_dir.replace( '[TIMESTAMP]', self.timestamp)
-        self.tb_log_dir = self.tb_log_dir.replace( '[REGULARIZATION]',
+        self.tb_log_dir = self.TB_LOG_DIR.replace( '[STORE-ID]',
+                                                   str(self.store_id))
+        self.tb_log_dir = self.tb_log_dir.replace( '[TIME]',
+                                                   self.timestamp)
+        self.tb_log_dir = self.tb_log_dir.replace( '[REG]',
                                                    str(self.regularization))
+        self.tb_log_dir = self.tb_log_dir.replace( '[LR]',
+                                                   str(self.learning_rate))
 
         return
 
