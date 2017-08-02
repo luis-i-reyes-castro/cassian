@@ -65,7 +65,9 @@ class CassianModel :
         self.regularization    = regularization
         self.learning_rate     = learning_rate
 
-        self.regularizer        = lambda : regularizers.l1(regularization)
+        self.regularize_hard = lambda : regularizers.l2( 1.0 * regularization )
+        self.regularize_soft = lambda : regularizers.l1( 0.1 * regularization )
+
         self.loss_functions     = {}
         self.validation_metrics = {}
 
@@ -84,10 +86,12 @@ class CassianModel :
 
         for ( i, layer_size) in enumerate( self.dense_layer_sizes) :
             layer_name = 'Feedforward-' + str(i+1)
-            layer = Dense( name = layer_name, units = layer_size,
-                           activation = 'softsign')
+            layer = Dense( name = layer_name,
+                           units = layer_size,
+                           activation = 'softsign',
+                           kernel_regularizer = self.regularize_hard(),
+                           bias_regularizer = self.regularize_soft() )
             last_output_vector = layer( last_output_vector )
-            # shape = ( batch_size, None, dim_reduction_layer_dim)
 
         # Builds a stack of NonlinearPID layes
 
@@ -98,22 +102,26 @@ class CassianModel :
             layer = NonlinearPID( name = layer_name,
                                   units = layer_size,
                                   return_sequences = True,
-                                  mat_W_p_regularizer = self.regularizer(),
-                                  mat_W_i_regularizer = self.regularizer(),
-                                  mat_W_d_regularizer = self.regularizer() )
+                                  mat_R_z_regularizer = self.regularize_soft(),
+                                  vec_b_z_regularizer = self.regularize_soft(),
+                                  mat_R_0_regularizer = self.regularize_hard(),
+                                  vec_b_0_regularizer = self.regularize_soft(),
+                                  mat_R_b_regularizer = self.regularize_soft(),
+                                  mat_W_p_regularizer = self.regularize_hard(),
+                                  mat_W_i_regularizer = self.regularize_hard(),
+                                  mat_W_d_regularizer = self.regularize_hard() )
             last_output_ts = layer( [ last_output_vector, last_output_ts] )
-            # shape = ( batch_size, None, layer_dim)
 
         # Builds Feedforward gain and biases
 
         FF_gain = Dense( name = 'Feedforward_Gain',
                          units = self.NLPID_layer_sizes[-1],
-                         kernel_regularizer = self.regularizer(),
-                         use_bias = True,
+                         kernel_regularizer = self.regularize_hard(),
+                         bias_regularizer = self.regularize_soft(),
                          bias_initializer = 'ones' )( last_output_vector )
         FF_bias = Dense( name = 'Feedforward_Bias',
                          units = self.NLPID_layer_sizes[-1],
-                         kernel_regularizer = self.regularizer(),
+                         kernel_regularizer = self.regularize_soft(),
                          use_bias = False )( last_output_vector )
 
         FF_gain = RepeatVector( name = 'Repeat_FF-Gain',
@@ -153,8 +161,8 @@ class CassianModel :
                                  input_dim = self.NLPID_layer_sizes[-1],
                                  units = layer_dim,
                                  activation = layer_activation,
-                                 kernel_regularizer = self.regularizer(),
-                                 use_bias = False)
+                                 kernel_regularizer = self.regularize_hard,
+                                 use_bias = False )
 
             output_tensor = TimeDistributed( name = layer_name,
                                              layer = dense_layer )( last_output_ts )
