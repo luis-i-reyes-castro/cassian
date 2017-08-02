@@ -299,12 +299,12 @@ class NonlinearPID ( Layer ) :
 
             # Computes (P) proportional, (I) integral and (D) difference terms.
             # Each of them has shape ( batch_size, units).
-            P_t = self.activation( K.dot( X_t, self.mat_W_p) )
+            P_t = self.activation( U_bias + K.dot( X_t, self.mat_W_p) )
             I_t = self.activation( I_tm1 + K.dot( X_t, self.mat_W_i) )
             D_t = self.activation( K.dot( X_t - X_tm1, self.mat_W_d) )
 
             # Computes output tensor, which has shape ( batch_size, units).
-            Y_t = U_bias + ( Z_p * P_t ) + ( Z_i * I_t ) + ( Z_d * D_t )
+            Y_t = ( Z_p * P_t ) + ( Z_i * I_t ) + ( Z_d * D_t )
             if 0 < self.dropout_u + self.dropout_x :
                 Y_t._uses_learning_phase = True
 
