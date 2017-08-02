@@ -41,8 +41,8 @@ class CassianModel :
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     def __init__( self, dataset_filename, batch_size,
                         timesteps = 90,
-                        dense_layer_sizes = [ 64 ],
-                        NLPID_layer_sizes = [ 256, 256],
+                        dense_layer_sizes = [ 64, 64 ],
+                        NLPID_layer_sizes = [ 256, 256 ],
                         regularization = 1E-4,
                         algorithm = 'Adam',
                         learning_rate = 0.002 ) :
@@ -117,7 +117,6 @@ class CassianModel :
         FF_gain = Dense( name = 'Feedforward_Gain',
                          units = self.NLPID_layer_sizes[-1],
                          kernel_regularizer = self.regularize_hard(),
-                         bias_regularizer = self.regularize_soft(),
                          bias_initializer = 'ones' )( last_output_vector )
         FF_bias = Dense( name = 'Feedforward_Bias',
                          units = self.NLPID_layer_sizes[-1],
@@ -161,7 +160,7 @@ class CassianModel :
                                  input_dim = self.NLPID_layer_sizes[-1],
                                  units = layer_dim,
                                  activation = layer_activation,
-                                 kernel_regularizer = self.regularize_hard,
+                                 kernel_regularizer = self.regularize_hard(),
                                  use_bias = False )
 
             output_tensor = TimeDistributed( name = layer_name,
