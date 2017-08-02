@@ -285,7 +285,7 @@ class CassianModel :
                            show_shapes = True, to_file = filename)
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-    def train_on_dataset( self, epochs = 1, patience = 60, workers = 4) :
+    def train_on_dataset( self, epochs = 1, patience = 100, workers = 4) :
 
         print( 'Current task: Training for ' + str(epochs) + ' epochs' )
 
