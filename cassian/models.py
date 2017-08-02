@@ -337,7 +337,7 @@ class CassianModel :
         epochs           = pieces_per_epoch * epochs
         patience         = pieces_per_epoch * patience
 
-        ( dataset_train, dataset_valid) = self.dataset.split(0.68)
+        ( dataset_train, dataset_valid) = self.dataset.split(0.8)
 
         steps_per_epoch_train = dataset_train.num_timesteps \
                               // ( self.batch_size * self.timesteps * pieces_per_epoch )
@@ -347,7 +347,7 @@ class CassianModel :
         ensure_directory(self.tb_log_dir)
 
         callbacks = [ ModelCheckpoint( self.weights_file,
-                                       monitor = 'val_Sold_root_mean_squared_error',
+                                       monitor = 'Sold_root_mean_squared_error',
                                        mode = 'min',
                                        save_weights_only = True,
                                        save_best_only = True),
