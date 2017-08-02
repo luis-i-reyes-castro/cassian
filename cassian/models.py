@@ -11,7 +11,7 @@ All rights reserved.
 import numpy as np
 import pandas as pd
 from keras import backend as K
-from keras.layers import Input, Dense
+from keras.layers import Input, Dense, RepeatVector, Multiply, Add
 from keras.layers.wrappers import TimeDistributed
 from keras.models import Model
 from keras import regularizers, optimizers
@@ -41,7 +41,7 @@ class CassianModel :
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     def __init__( self, dataset_filename, batch_size,
                         timesteps = 90,
-                        dense_layer_sizes = [],
+                        dense_layer_sizes = [ 64 ],
                         NLPID_layer_sizes = [ 256, 256],
                         regularization = 1E-4,
                         algorithm = 'Adam',
@@ -65,23 +65,22 @@ class CassianModel :
         self.regularization    = regularization
         self.learning_rate     = learning_rate
 
-        self.regularizer    = lambda : regularizers.l1(regularization)
-        self.outputs_list   = []
-        self.loss_functions = {}
+        self.regularizer        = lambda : regularizers.l1(regularization)
+        self.loss_functions     = {}
+        self.validation_metrics = {}
 
         # -----------------------------------------------------------------------------
-        # Builds the input layers and the dimensionality reduction layer
+        # Builds the U-input and X-input layers
 
-        self.X_vecs_shape = ( batch_size, self.dataset.vec_dim)
-        self.X_ts_shape   = ( batch_size, None, self.dataset.ts_dim)
+        U_vecs_shape = ( batch_size, self.dataset.vec_dim)
+        U_vecs       = Input( batch_shape = U_vecs_shape, name = 'U_vectors')
 
-        X_vecs = Input( batch_shape = self.X_vecs_shape, name = 'Product_Vectors')
-        X_ts   = Input( batch_shape = self.X_ts_shape, name = 'Product_TS')
+        X_vecs_shape = ( batch_size, None, self.dataset.ts_dim)
+        X_vecs       = Input( batch_shape = X_vecs_shape, name = 'X_t_vectors')
 
-        # -----------------------------------------------------------------------------
-        # Builds a stack of several layers of dimensionality reduction
+        # Builds a stack of dense layers
 
-        last_output_vector = X_vecs
+        last_output_vector = U_vecs
 
         for ( i, layer_size) in enumerate( self.dense_layer_sizes) :
             layer_name = 'Feedforward-' + str(i+1)
@@ -90,10 +89,9 @@ class CassianModel :
             last_output_vector = layer( last_output_vector )
             # shape = ( batch_size, None, dim_reduction_layer_dim)
 
-        # -----------------------------------------------------------------------------
-        # Builds a stack of several layers of Vector-dependent gated RNNs
+        # Builds a stack of NonlinearPID layes
 
-        last_output_ts = X_ts
+        last_output_ts = X_vecs
 
         for ( i, layer_size) in enumerate( self.NLPID_layer_sizes) :
             layer_name = 'NonlinearPID-'+ str(i+1)
@@ -106,70 +104,65 @@ class CassianModel :
             last_output_ts = layer( [ last_output_vector, last_output_ts] )
             # shape = ( batch_size, None, layer_dim)
 
-        # -----------------------------------------------------------------------------
-        # Builds the first two output timeseries: sold and is-on-sale
+        # Builds Feedforward gain and biases
+
+        FF_gain = Dense( name = 'Feedforward_Gain',
+                         units = self.NLPID_layer_sizes[-1],
+                         kernel_regularizer = self.regularizer(),
+                         use_bias = True,
+                         bias_initializer = 'ones' )( last_output_vector )
+        FF_bias = Dense( name = 'Feedforward_Bias',
+                         units = self.NLPID_layer_sizes[-1],
+                         kernel_regularizer = self.regularizer(),
+                         use_bias = False )( last_output_vector )
+
+        FF_gain = RepeatVector( name = 'Repeat_FF-Gain',
+                                n = self.timesteps)( FF_gain)
+        FF_bias = RepeatVector( name = 'Repeat_FF-Bias',
+                                n = self.timesteps)( FF_bias)
+
+        # Applies gain and bias
+        last_output_ts = Multiply( name = 'Apply_FF-Gain')( [ FF_gain, last_output_ts] )
+        last_output_ts = Add( name = 'Apply_FF-bias')( [ FF_bias, last_output_ts] )
+
+        # Builds the list of outputs.
         # The first output is the mean of a Poisson random variable
-        # (a strictly positive real number) and is trained with Poisson loss
-        # The second output is binary and is trained with binary cross-entropy
+        # (a strictly positive real number) and is trained with Poisson loss.
+        # The second output is binary and is trained with binary cross-entropy.
+        # The last five outputs are each probability vectors (i.e. softmax)
+        # trained with sparse categorical cross-entropy
 
-        dense_layer_names = [ 'Out-1', 'Out-2']
-        layer_names       = [ 'Sold', 'Is_On_Sale' ]
+        outputs_list = []
 
-        def zero_one_softsign( tensor) :
-            return 0.5 + 0.5 * K.softsign( 4.0 * tensor )
+        dense_layer_names = [ 'Out-' + str(i+1) for i in range(7) ]
+        layer_names       = [ 'Sold', 'Is_On_Sale',
+                              'Replenished', 'Returned', 'Trashed',
+                              'Found', 'Missing' ]
+        layer_dims        = [ 1, 1,
+                              self.dataset.z_replenished_dim,
+                              self.dataset.z_returned_dim,
+                              self.dataset.z_trashed_dim,
+                              self.dataset.z_found_dim,
+                              self.dataset.z_missing_dim ]
+        layer_activations = [ K.exp, K.sigmoid ] + 5 * [ 'softmax' ]
 
-        layer_activations = [ K.exp, zero_one_softsign ]
-        layer_losses      = [ 'poisson', 'binary_crossentropy' ]
-
-        for ( dense_layer_name, layer_name, layer_activation, layer_loss) in \
-            zip( dense_layer_names, layer_names, layer_activations, layer_losses) :
-
-            dense_layer = Dense( name = dense_layer_name,
-                                 input_dim = self.NLPID_layer_sizes[-1],
-                                 units = 1,
-                                 activation = layer_activation,
-                                 kernel_regularizer = self.regularizer(),
-                                 use_bias = False )
-
-            output_tensor = \
-            TimeDistributed( name = layer_name, layer = dense_layer)( last_output_ts )
-
-            self.outputs_list.append( output_tensor)
-            self.loss_functions[layer_name] = layer_loss
-
-        # -----------------------------------------------------------------------------
-        # Builds the last five output timeseries, each of which is a
-        # probability softmax (i.e. a softmax) trained with
-        # sparse categorical cross-entropy
-
-        dense_layer_names = [ 'Out-' + str(i+3) for i in range(5)  ]
-        layer_names = [ 'Replenished', 'Returned', 'Trashed', 'Found', 'Missing' ]
-        layer_dims  = [ self.dataset.z_replenished_dim,
-                        self.dataset.z_returned_dim,
-                        self.dataset.z_trashed_dim,
-                        self.dataset.z_found_dim,
-                        self.dataset.z_missing_dim ]
-        layer_losses = 'sparse_categorical_crossentropy'
-
-        for ( dense_layer_name, layer_name, layer_dim) in \
-            zip( dense_layer_names, layer_names, layer_dims) :
+        for ( dense_layer_name, layer_name, layer_dim, layer_activation) in \
+            zip( dense_layer_names, layer_names, layer_dims, layer_activations) :
 
             dense_layer = Dense( name = dense_layer_name,
                                  input_dim = self.NLPID_layer_sizes[-1],
                                  units = layer_dim,
-                                 activation = 'softmax',
+                                 activation = layer_activation,
                                  kernel_regularizer = self.regularizer(),
-                                 use_bias = False )
+                                 use_bias = False)
 
-            output_tensor = \
-            TimeDistributed( name = layer_name, layer = dense_layer)( last_output_ts )
+            output_tensor = TimeDistributed( name = layer_name,
+                                             layer = dense_layer )( last_output_ts )
 
-            self.outputs_list.append( output_tensor)
-            self.loss_functions[layer_name] = layer_losses
+            outputs_list.append( output_tensor)
 
         # -----------------------------------------------------------------------------
-        self.model = Model( inputs = [ X_vecs, X_ts],
-                            outputs = self.outputs_list )
+        self.model = Model( inputs = [ U_vecs, X_vecs], outputs = outputs_list)
         self.compile_model()
 
         # -----------------------------------------------------------------------------
@@ -209,11 +202,19 @@ class CassianModel :
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     def compile_model( self) :
 
-        self.validation_metrics = {}
-
         def root_mean_squared_error( y_true, y_pred) :
             return K.sqrt( K.mean( K.square(y_pred - y_true), axis=-1) )
 
+        self.loss_functions                = {}
+        self.loss_functions['Sold']        = 'poisson'
+        self.loss_functions['Is_On_Sale']  = 'binary_crossentropy'
+        self.loss_functions['Replenished'] = 'sparse_categorical_crossentropy'
+        self.loss_functions['Returned']    = 'sparse_categorical_crossentropy'
+        self.loss_functions['Trashed']     = 'sparse_categorical_crossentropy'
+        self.loss_functions['Found']       = 'sparse_categorical_crossentropy'
+        self.loss_functions['Missing']     = 'sparse_categorical_crossentropy'
+
+        self.validation_metrics                = {}
         self.validation_metrics['Sold']        = root_mean_squared_error
         self.validation_metrics['Is_On_Sale']  = 'accuracy'
         self.validation_metrics['Replenished'] = 'categorical_accuracy'
@@ -226,9 +227,9 @@ class CassianModel :
                                           beta_1 = 0.9,
                                           beta_2 = 0.99 )
 
-        self.model.compile( optimizer = self.optimizer,
-                            loss = self.loss_functions,
-                            metrics = self.validation_metrics )
+        self.model.compile( loss = self.loss_functions,
+                            metrics = self.validation_metrics,
+                            optimizer = self.optimizer )
 
         return
 
