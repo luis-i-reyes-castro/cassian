@@ -42,7 +42,7 @@ class CassianModel :
     def __init__( self, dataset_filename, batch_size,
                         timesteps = 90,
                         dense_layer_sizes = [ 64, 64 ],
-                        NLPID_layer_sizes = [ 256, 256 ],
+                        NLPID_layer_sizes = [ 256, 128, 128 ],
                         regularization = 1E-4,
                         algorithm = 'Adam',
                         learning_rate = 0.002 ) :
@@ -102,7 +102,7 @@ class CassianModel :
             layer = NonlinearPID( name = layer_name,
                                   units = layer_size,
                                   return_sequences = True,
-                                  mat_R_z_regularizer = self.regularize_soft(),
+                                  mat_R_z_regularizer = self.regularize_hard(),
                                   vec_b_z_regularizer = self.regularize_soft(),
                                   mat_R_0_regularizer = self.regularize_hard(),
                                   vec_b_0_regularizer = self.regularize_soft(),
@@ -117,10 +117,11 @@ class CassianModel :
         FF_gain = Dense( name = 'Feedforward_Gain',
                          units = self.NLPID_layer_sizes[-1],
                          kernel_regularizer = self.regularize_hard(),
-                         bias_initializer = 'ones' )( last_output_vector )
+                         bias_regularizer = self.regularize_hard(),
+                         activation = K.exp )( last_output_vector )
         FF_bias = Dense( name = 'Feedforward_Bias',
                          units = self.NLPID_layer_sizes[-1],
-                         kernel_regularizer = self.regularize_soft(),
+                         kernel_regularizer = self.regularize_hard(),
                          use_bias = False )( last_output_vector )
 
         FF_gain = RepeatVector( name = 'Repeat_FF-Gain',
@@ -161,7 +162,7 @@ class CassianModel :
                                  units = layer_dim,
                                  activation = layer_activation,
                                  kernel_regularizer = self.regularize_hard(),
-                                 use_bias = False )
+                                 bias_regularizer = self.regularize_soft() )
 
             output_tensor = TimeDistributed( name = layer_name,
                                              layer = dense_layer )( last_output_ts )
@@ -233,6 +234,10 @@ class CassianModel :
         self.optimizer = optimizers.Adam( lr = self.learning_rate,
                                           beta_1 = 0.9,
                                           beta_2 = 0.99 )
+
+#        self.optimizer = optimizers.SGD( lr = self.learning_rate,
+#                                         momentum = 0.9,
+#                                         nesterov = True )
 
         self.model.compile( loss = self.loss_functions,
                             metrics = self.validation_metrics,
