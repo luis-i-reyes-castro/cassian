@@ -41,8 +41,8 @@ class CassianModel :
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     def __init__( self, dataset_filename, batch_size,
                         timesteps = 90,
-                        dense_layer_sizes = [ 64, 64 ],
-                        NLPID_layer_sizes = [ 256, 128, 128 ],
+                        dense_layer_sizes = [ 128, 64 ],
+                        NLPID_layer_sizes = [ 256, 256 ],
                         regularization = 1E-4,
                         algorithm = 'Adam',
                         learning_rate = 0.002 ) :
@@ -106,32 +106,23 @@ class CassianModel :
                                   vec_b_z_regularizer = self.regularize_soft(),
                                   mat_R_0_regularizer = self.regularize_hard(),
                                   vec_b_0_regularizer = self.regularize_soft(),
-                                  mat_R_b_regularizer = self.regularize_soft(),
+                                  mat_R_b_regularizer = self.regularize_hard(),
                                   mat_W_p_regularizer = self.regularize_hard(),
                                   mat_W_i_regularizer = self.regularize_hard(),
                                   mat_W_d_regularizer = self.regularize_hard() )
             last_output_ts = layer( [ last_output_vector, last_output_ts] )
 
-        # Builds Feedforward gain and biases
+        # Builds Feedforward gain
 
-        FF_gain = Dense( name = 'Feedforward_Gain',
+        FF_gain = Dense( name = 'U-Gain',
                          units = self.NLPID_layer_sizes[-1],
                          kernel_regularizer = self.regularize_hard(),
-                         bias_regularizer = self.regularize_hard(),
+                         use_bias = False,
                          activation = K.exp )( last_output_vector )
-        FF_bias = Dense( name = 'Feedforward_Bias',
-                         units = self.NLPID_layer_sizes[-1],
-                         kernel_regularizer = self.regularize_hard(),
-                         use_bias = False )( last_output_vector )
-
-        FF_gain = RepeatVector( name = 'Repeat_FF-Gain',
-                                n = self.timesteps)( FF_gain)
-        FF_bias = RepeatVector( name = 'Repeat_FF-Bias',
-                                n = self.timesteps)( FF_bias)
+        FF_gain = RepeatVector( name = 'Repeat', n = self.timesteps)( FF_gain)
 
         # Applies gain and bias
-        last_output_ts = Multiply( name = 'Apply_FF-Gain')( [ FF_gain, last_output_ts] )
-        last_output_ts = Add( name = 'Apply_FF-bias')( [ FF_bias, last_output_ts] )
+        last_output_ts = Multiply( name = 'Apply')( [ FF_gain, last_output_ts] )
 
         # Builds the list of outputs.
         # The first output is the mean of a Poisson random variable
@@ -162,7 +153,7 @@ class CassianModel :
                                  units = layer_dim,
                                  activation = layer_activation,
                                  kernel_regularizer = self.regularize_hard(),
-                                 bias_regularizer = self.regularize_soft() )
+                                 bias_regularizer = self.regularize_hard() )
 
             output_tensor = TimeDistributed( name = layer_name,
                                              layer = dense_layer )( last_output_ts )

@@ -257,6 +257,7 @@ class NonlinearPID ( Layer ) :
         # shape = ( batch_size, 3 * units)
         Z_pid = K.reshape( Z_pid, ( -1, self.units, 3) )
         # shape = ( batch_size, units, 3)
+        Z_pid = K.softmax( Z_pid)
         Z_p = Z_pid[ :, :, 0]
         Z_i = Z_pid[ :, :, 1]
         Z_d = Z_pid[ :, :, 2]
@@ -291,6 +292,7 @@ class NonlinearPID ( Layer ) :
             # Input X_t is a tensor of shape ( batch_size, X_dim)
             if self.dropout_x :
                 X_t = X_t * X_mask
+
             # List of previous states contains two tensors:
             # Previous integral I_{t-1} with shape = ( batch_size, units);
             # Previous input X_{t-1} with shape = ( batch_size, X_dim).
@@ -305,6 +307,7 @@ class NonlinearPID ( Layer ) :
 
             # Computes output tensor, which has shape ( batch_size, units).
             Y_t = ( Z_p * P_t ) + ( Z_i * I_t ) + ( Z_d * D_t )
+
             if 0 < self.dropout_u + self.dropout_x :
                 Y_t._uses_learning_phase = True
 
