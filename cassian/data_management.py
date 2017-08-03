@@ -576,13 +576,18 @@ class Dataset :
 
         self.ts_std = np.sqrt( self.ts_std )
 
+        self.vec_power = 1.0 / self.vec_mean.clip( min = 0.001)
+        self.vec_power = self.vec_power.clip( max = self.vec_power.mean() \
+                                                  + 1.5 * self.vec_power.std() )
+
         return
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-    def normalize_timeseries( self, de_normalize = False) :
+    def normalize_timeseries( self, mode = 'positive-unit') :
 
         for sku in self.list_of_skus :
-            self.data[sku].normalize_ts( self.ts_mean, self.ts_std, de_normalize)
+            self.data[sku].normalize_inputs( mode, self.vec_power,
+                                                   self.ts_mean, self.ts_std )
 
         return
 
@@ -635,6 +640,9 @@ class Dataset :
         datasets[1].vec_std  = datasets[0].vec_std
         datasets[1].ts_mean  = datasets[0].ts_mean
         datasets[1].ts_std   = datasets[0].ts_std
+
+        datasets[0].vec_power = self.vec_power
+        datasets[1].vec_power = self.vec_power
 
         datasets[0].normalize_timeseries()
         datasets[1].normalize_timeseries()
@@ -720,14 +728,19 @@ class SkuData :
         return np.mean( np.square(diff), axis = 0)
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-    def normalize_ts( self, ts_mean, ts_std, de_normalize = False) :
+    def normalize_inputs( self, mode, vec_power, ts_mean, ts_std) :
 
-        if not de_normalize :
+        self.vec = self.vec * vec_power
+
+        if mode == 'normal' :
             self.ts -= ts_mean
             self.ts /= ts_std
+
+        elif mode == 'positive-unit' :
+            self.ts /= ts_std
+
         else :
-            self.ts *= ts_std
-            self.ts += ts_mean
+            raise ValueError( 'Invalid normalization mode!' )
 
         return
 
