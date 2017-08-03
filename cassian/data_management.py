@@ -203,7 +203,7 @@ class Dataset :
             self.data[sku].z_missing_dim = \
             self.categorizer['Z5'].num_categories
 
-        self.update_num_timesteps_and_list_of_sku_probs( 'daily-net-utility' )
+        self.update_num_timesteps_and_list_of_sku_probs()
 
         arbitrary_sku_obj      = self.data[ self.list_of_skus[0] ]
         self.vec_dim           = arbitrary_sku_obj.vec_dim
@@ -533,7 +533,7 @@ class Dataset :
         return de_serialize( dataset_filename)
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-    def update_num_timesteps_and_list_of_sku_probs( self, prob_func = 'timesteps') :
+    def update_num_timesteps_and_list_of_sku_probs( self, prob_func = 'utility') :
 
         self.num_timesteps = 0
         self.list_of_sku_probs = [ 0.0 for sku in self.list_of_skus ]
@@ -547,7 +547,7 @@ class Dataset :
                 self.list_of_sku_probs[i] = \
                 float( self.data[sku].num_timesteps) / self.num_timesteps
 
-        elif prob_func == 'daily-net-utility' :
+        elif prob_func == 'utility' :
 
             total_DNU = self.info_replenish['DAILY_NET_UTILITY'].sum()
 
