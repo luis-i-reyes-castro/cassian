@@ -42,7 +42,7 @@ class CassianModel :
     def __init__( self, dataset_filename, batch_size,
                         timesteps = 90,
                         dense_layer_sizes = [ 128, 64 ],
-                        NLPID_layer_sizes = [ 256, 256 ],
+                        NLPID_layer_sizes = [ 128, 128 ],
                         regularization = 1E-4,
                         algorithm = 'Adam',
                         learning_rate = 0.002 ) :
@@ -66,7 +66,7 @@ class CassianModel :
         self.learning_rate     = learning_rate
 
         self.regularize_hard = lambda : regularizers.l2( 1.0 * regularization )
-        self.regularize_soft = lambda : regularizers.l1( 0.1 * regularization )
+        self.regularize_soft = lambda : regularizers.l1( 0.001 * regularization )
 
         self.loss_functions     = {}
         self.validation_metrics = {}
@@ -111,18 +111,6 @@ class CassianModel :
                                   mat_W_i_regularizer = self.regularize_hard(),
                                   mat_W_d_regularizer = self.regularize_hard() )
             last_output_ts = layer( [ last_output_vector, last_output_ts] )
-
-        # Builds Feedforward gain
-
-        FF_gain = Dense( name = 'U-Gain',
-                         units = self.NLPID_layer_sizes[-1],
-                         kernel_regularizer = self.regularize_hard(),
-                         use_bias = False,
-                         activation = K.exp )( last_output_vector )
-        FF_gain = RepeatVector( name = 'Repeat', n = self.timesteps)( FF_gain)
-
-        # Applies gain and bias
-        last_output_ts = Multiply( name = 'Apply')( [ FF_gain, last_output_ts] )
 
         # Builds the list of outputs.
         # The first output is the mean of a Poisson random variable
@@ -332,7 +320,7 @@ class CassianModel :
         epochs           = pieces_per_epoch * epochs
         patience         = pieces_per_epoch * patience
 
-        ( dataset_train, dataset_valid) = self.dataset.split(0.8)
+        ( dataset_train, dataset_valid) = self.dataset.split(0.68)
 
         steps_per_epoch_train = dataset_train.num_timesteps \
                               // ( self.batch_size * self.timesteps * pieces_per_epoch )
