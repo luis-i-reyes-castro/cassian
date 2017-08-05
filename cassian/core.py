@@ -184,7 +184,7 @@ class NonlinearPID ( Layer ) :
         self.vec_b_0 = K.tile( self.vec_b_0, ( batch_size, 1) )
 
         self.mat_R_b = self.add_weight( name = 'mat_R_b',
-                                        shape = ( U_dim, self.units),
+                                        shape = ( U_dim, 2 * self.units),
                                         initializer = self.mat_R_b_initializer,
                                         regularizer = self.mat_R_b_regularizer)
 
@@ -249,18 +249,19 @@ class NonlinearPID ( Layer ) :
             U_vecs = K.in_train_phase( U_vecs * U_mask, U_vecs, training)
 
         # Computes U-input-dependent biases
-        U_bias = K.dot( U_vecs, self.mat_R_b) # shape = ( batch_size, units)
+        U_bias   = K.dot( U_vecs, self.mat_R_b) # shp = ( batch, 2 * units)
+        U_bias   = K.reshape( U_bias, ( -1, self.units, 2) ) # shp = ( batch, units, 2)
+        U_bias_p = U_bias[ :, :, 0] # shape = ( batch_size, units)
+        U_bias_i = U_bias[ :, :, 1] # shape = ( batch_size, units)
 
         # Computes channel selectors (i.e. Z-vectors) from U-inputs, resulting in
         # tensors Z_p, Z_i and Z_d, each with shape ( batch_size, units).
-        Z_pid = K.dot( U_vecs, self.mat_R_z) + self.vec_b_z
-        # shape = ( batch_size, 3 * units)
-        Z_pid = K.reshape( Z_pid, ( -1, self.units, 3) )
-        # shape = ( batch_size, units, 3)
-        Z_pid = K.softmax( Z_pid)
-        Z_p = Z_pid[ :, :, 0]
-        Z_i = Z_pid[ :, :, 1]
-        Z_d = Z_pid[ :, :, 2]
+        Z_pid = K.dot( U_vecs, self.mat_R_z) + self.vec_b_z # shp = ( batch, 3 * units)
+        Z_pid = K.reshape( Z_pid, ( -1, self.units, 3) ) # shp = ( batch, units, 3)
+        Z_pid = K.exp( Z_pid)
+        Z_p   = Z_pid[ :, :, 0]
+        Z_i   = Z_pid[ :, :, 1]
+        Z_d   = Z_pid[ :, :, 2]
 
         # Builds X-inputs dropout mask if applicable
         if 0 < self.dropout_x < 1 :
@@ -301,8 +302,8 @@ class NonlinearPID ( Layer ) :
 
             # Computes (P) proportional, (I) integral and (D) difference terms.
             # Each of them has shape ( batch_size, units).
-            P_t = self.activation( U_bias + K.dot( X_t, self.mat_W_p) )
-            I_t = self.activation( I_tm1 + K.dot( X_t, self.mat_W_i) )
+            P_t = self.activation( K.dot( X_t, self.mat_W_p) + U_bias_p )
+            I_t = self.activation( I_tm1 + K.dot( X_t, self.mat_W_i) + U_bias_i )
             D_t = self.activation( K.dot( X_t - X_tm1, self.mat_W_d) )
 
             # Computes output tensor, which has shape ( batch_size, units).
