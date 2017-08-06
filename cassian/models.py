@@ -211,9 +211,9 @@ class CassianModel :
         self.validation_metrics['Missing']     = 'categorical_accuracy'
 
         self.optimizer = optimizers.Adam( lr = self.learning_rate,
+                                          decay = 1E-4,
                                           beta_1 = 0.9,
-                                          beta_2 = 0.99,
-                                          decay = 0.001 )
+                                          beta_2 = 0.998 )
 
 #        self.optimizer = optimizers.SGD( lr = self.learning_rate,
 #                                         momentum = 0.9,
