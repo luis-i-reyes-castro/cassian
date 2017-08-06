@@ -109,7 +109,9 @@ class CassianModel :
                                   mat_R_b_regularizer = self.regularize_hard(),
                                   mat_W_p_regularizer = self.regularize_hard(),
                                   mat_W_i_regularizer = self.regularize_hard(),
-                                  mat_W_d_regularizer = self.regularize_hard() )
+                                  mat_W_d_regularizer = self.regularize_hard(),
+                                  dropout_u = 0.6,
+                                  dropout_x = 0.0 if i == 0 else 0.6 )
             last_output_ts = layer( [ last_output_vector, last_output_ts] )
 
         # Builds the list of outputs.
