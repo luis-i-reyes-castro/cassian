@@ -41,7 +41,7 @@ class CassianModel :
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     def __init__( self, dataset_filename, batch_size,
                         timesteps = 90,
-                        dense_layer_sizes = [ 128, 64 ],
+                        dense_layer_sizes = [ 128 ],
                         NLPID_layer_sizes = [ 512, 256 ],
                         regularization = 1.0,
                         algorithm = 'Adam',
@@ -110,8 +110,8 @@ class CassianModel :
                                   mat_W_p_regularizer = self.regularize_hard(),
                                   mat_W_i_regularizer = self.regularize_hard(),
                                   mat_W_d_regularizer = self.regularize_hard(),
-                                  dropout_u = 0.6,
-                                  dropout_x = 0.0 if i == 0 else 0.6 )
+                                  dropout_u = 0.5,
+                                  dropout_x = 0.0 if i == 0 else 0.5 )
             last_output_ts = layer( [ last_output_vector, last_output_ts] )
 
         # Builds the list of outputs.

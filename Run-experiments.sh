@@ -8,9 +8,9 @@ rm trained-models/*
 rm results/*
 rm -r tensorboard-logs/*
 
-for LEARNING_RATE in 1E-3 2E-3
+for LEARNING_RATE in 1E-3 2E-3 4E-3
 do
-for REGULARIZATION in 1E-3 2E-3 4E-3
+for REGULARIZATION in 1E-5 2E-5 4E-5
 do
 ./Cassian.py --store $STORE --train --epochs $EPOCHS_PER_RUN --batch-size $BATCH_SIZE --workers 6 --regularization $REGULARIZATION --learning-rate $LEARNING_RATE
 done
