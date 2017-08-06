@@ -11,7 +11,7 @@ All rights reserved.
 import numpy as np
 import pandas as pd
 from keras import backend as K
-from keras.layers import Input, Dense, RepeatVector, Multiply, Add
+from keras.layers import Input, Dense
 from keras.layers.wrappers import TimeDistributed
 from keras.models import Model
 from keras import regularizers, optimizers
@@ -42,10 +42,10 @@ class CassianModel :
     def __init__( self, dataset_filename, batch_size,
                         timesteps = 90,
                         dense_layer_sizes = [ 128, 64 ],
-                        NLPID_layer_sizes = [ 128, 128 ],
-                        regularization = 1E-4,
+                        NLPID_layer_sizes = [ 512, 256 ],
+                        regularization = 1.0,
                         algorithm = 'Adam',
-                        learning_rate = 0.002 ) :
+                        learning_rate = 1E-4 ) :
 
         print( 'Current task: Loading Dataset instance' )
         if not exists_file( dataset_filename) :
@@ -65,7 +65,7 @@ class CassianModel :
         self.regularization    = regularization
         self.learning_rate     = learning_rate
 
-        self.regularize_hard = lambda : regularizers.l2( 1.0 * regularization )
+        self.regularize_hard = lambda : regularizers.l1( regularization )
         self.regularize_soft = lambda : regularizers.l1( 0.001 * regularization )
 
         self.loss_functions     = {}
@@ -212,7 +212,8 @@ class CassianModel :
 
         self.optimizer = optimizers.Adam( lr = self.learning_rate,
                                           beta_1 = 0.9,
-                                          beta_2 = 0.99 )
+                                          beta_2 = 0.99,
+                                          decay = 0.001 )
 
 #        self.optimizer = optimizers.SGD( lr = self.learning_rate,
 #                                         momentum = 0.9,
