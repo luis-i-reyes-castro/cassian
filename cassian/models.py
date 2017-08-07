@@ -11,7 +11,7 @@ All rights reserved.
 import numpy as np
 import pandas as pd
 from keras import backend as K
-from keras.layers import Input, Dense
+from keras.layers import Input, Dense, Dropout
 from keras.layers.wrappers import TimeDistributed
 from keras.models import Model
 from keras import regularizers, optimizers
@@ -41,11 +41,11 @@ class CassianModel :
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     def __init__( self, dataset_filename, batch_size,
                         timesteps = 90,
-                        dense_layer_sizes = [ 128 ],
-                        NLPID_layer_sizes = [ 512, 256 ],
-                        regularization = 1.0,
-                        algorithm = 'Adam',
-                        learning_rate = 1E-4 ) :
+                        dense_layer_sizes = [ 512, 256 ],
+                        NLPID_layer_sizes = [ 1024, 512, 256 ],
+                        regularization = 1E-6,
+                        dropout = 0.5,
+                        learning_rate = 1E-3 ) :
 
         print( 'Current task: Loading Dataset instance' )
         if not exists_file( dataset_filename) :
@@ -63,6 +63,7 @@ class CassianModel :
         self.dense_layer_sizes = dense_layer_sizes
         self.NLPID_layer_sizes = NLPID_layer_sizes
         self.regularization    = regularization
+        self.dropout           = dropout
         self.learning_rate     = learning_rate
 
         self.regularize_hard = lambda : regularizers.l1( regularization )
@@ -82,7 +83,7 @@ class CassianModel :
 
         # Builds a stack of dense layers
 
-        last_output_vector = U_vecs
+        highest_U_vecs = U_vecs
 
         for ( i, layer_size) in enumerate( self.dense_layer_sizes) :
             layer_name = 'Feedforward-' + str(i+1)
@@ -91,11 +92,13 @@ class CassianModel :
                            activation = 'softsign',
                            kernel_regularizer = self.regularize_hard(),
                            bias_regularizer = self.regularize_soft() )
-            last_output_vector = layer( last_output_vector )
+            highest_U_vecs = layer( highest_U_vecs )
+            highest_U_vecs = Dropout( name = 'Dropout-FF-' + str(i+1),
+                                      rate = self.dropout )( highest_U_vecs )
 
-        # Builds a stack of NonlinearPID layes
+        # Builds a stack of NonlinearPID layers
 
-        last_output_ts = X_vecs
+        highest_X_vecs = X_vecs
 
         for ( i, layer_size) in enumerate( self.NLPID_layer_sizes) :
             layer_name = 'NonlinearPID-'+ str(i+1)
@@ -110,9 +113,8 @@ class CassianModel :
                                   mat_W_p_regularizer = self.regularize_hard(),
                                   mat_W_i_regularizer = self.regularize_hard(),
                                   mat_W_d_regularizer = self.regularize_hard(),
-                                  dropout_u = 0.5,
-                                  dropout_x = 0.0 if i == 0 else 0.5 )
-            last_output_ts = layer( [ last_output_vector, last_output_ts] )
+                                  dropout_x = 0.0 if i == 0 else self.dropout )
+            highest_X_vecs = layer( [ highest_U_vecs, highest_X_vecs] )
 
         # Builds the list of outputs.
         # The first output is the mean of a Poisson random variable
@@ -146,7 +148,7 @@ class CassianModel :
                                  bias_regularizer = self.regularize_hard() )
 
             output_tensor = TimeDistributed( name = layer_name,
-                                             layer = dense_layer )( last_output_ts )
+                                             layer = dense_layer )( highest_X_vecs )
 
             outputs_list.append( output_tensor)
 
