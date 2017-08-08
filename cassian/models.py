@@ -41,10 +41,9 @@ class CassianModel :
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     def __init__( self, dataset_filename, batch_size,
                         timesteps = 90,
-                        dense_layer_sizes = [ 512, 256 ],
-                        NLPID_layer_sizes = [ 1024, 512, 256 ],
-                        regularization = 1E-6,
-                        dropout = 0.5,
+                        dense_layer_sizes = [ 128 ],
+                        NLPID_layer_sizes = [ 128 ],
+                        regularization = 1E-5,
                         learning_rate = 1E-3 ) :
 
         print( 'Current task: Loading Dataset instance' )
@@ -63,7 +62,8 @@ class CassianModel :
         self.dense_layer_sizes = dense_layer_sizes
         self.NLPID_layer_sizes = NLPID_layer_sizes
         self.regularization    = regularization
-        self.dropout           = dropout
+        # self.dropout_u         = None
+        # self.dropout_x         = None
         self.learning_rate     = learning_rate
 
         self.regularize_hard = lambda : regularizers.l1( regularization )
@@ -93,8 +93,8 @@ class CassianModel :
                            kernel_regularizer = self.regularize_hard(),
                            bias_regularizer = self.regularize_soft() )
             highest_U_vecs = layer( highest_U_vecs )
-            highest_U_vecs = Dropout( name = 'Dropout-FF-' + str(i+1),
-                                      rate = self.dropout )( highest_U_vecs )
+            # highest_U_vecs = Dropout( name = 'Dropout-FF-' + str(i+1),
+            #                           rate = self.dropout_u )( highest_U_vecs )
 
         # Builds a stack of NonlinearPID layers
 
@@ -112,8 +112,7 @@ class CassianModel :
                                   mat_R_b_regularizer = self.regularize_hard(),
                                   mat_W_p_regularizer = self.regularize_hard(),
                                   mat_W_i_regularizer = self.regularize_hard(),
-                                  mat_W_d_regularizer = self.regularize_hard(),
-                                  dropout_x = 0.0 if i == 0 else self.dropout )
+                                  mat_W_d_regularizer = self.regularize_hard() )
             highest_X_vecs = layer( [ highest_U_vecs, highest_X_vecs] )
 
         # Builds the list of outputs.
@@ -436,7 +435,7 @@ class CassianModel :
 
         summary['Days_of_Stock'] = \
         summary['Initial_Stock'] / summary['Expected_Sales']
-        summary.sort_values( by = 'Days_of_Stock', ascending = False, inplace = True)
+        summary.sort_values( by = 'Expected_Sales', ascending = False, inplace = True)
 
         results_dict                = {}
         results_dict['predictions'] = predictions
