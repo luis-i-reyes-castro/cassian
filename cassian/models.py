@@ -41,9 +41,9 @@ class CassianModel :
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     def __init__( self, dataset_filename, batch_size,
                         timesteps = 90,
-                        dense_layer_sizes = [ 128 ],
-                        NLPID_layer_sizes = [ 128 ],
-                        regularization = 1E-5,
+                        dense_layer_sizes = [ 64 ],
+                        NLPID_layer_sizes = [ 512 ],
+                        regularization = 1E-4,
                         learning_rate = 1E-3 ) :
 
         print( 'Current task: Loading Dataset instance' )
