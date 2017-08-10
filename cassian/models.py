@@ -41,8 +41,8 @@ class CassianModel :
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     def __init__( self, dataset_filename, batch_size,
                         timesteps = 90,
-                        dense_layer_sizes = [ 64 ],
-                        NLPID_layer_sizes = [ 512 ],
+                        dense_layer_sizes = [ 256, 128 ],
+                        NLPID_layer_sizes = [ 256, 256 ],
                         regularization = 1E-4,
                         learning_rate = 1E-3 ) :
 
