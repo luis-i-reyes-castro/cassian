@@ -533,27 +533,23 @@ class Dataset :
         return de_serialize( dataset_filename)
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-    def update_num_timesteps_and_list_of_sku_probs( self, prob_func = 'utility') :
+    def update_num_timesteps_and_list_of_sku_probs( self, fraction_utility = 0.5) :
 
         self.num_timesteps = 0
-        self.list_of_sku_probs = [ 0.0 for sku in self.list_of_skus ]
-
         for sku in self.list_of_skus :
             self.num_timesteps += self.data[sku].num_timesteps
 
-        if prob_func == 'timesteps' :
+        daily_net_utility      = self.info_replenish['DAILY_NET_UTILITY']
+        total_DNU              = daily_net_utility.sum()
+        self.list_of_sku_probs = [ 0.0 for sku in self.list_of_skus ]
 
-            for ( i, sku) in enumerate( self.list_of_skus ) :
-                self.list_of_sku_probs[i] = \
-                float( self.data[sku].num_timesteps) / self.num_timesteps
+        for ( i, sku) in enumerate( self.list_of_skus ) :
 
-        elif prob_func == 'utility' :
+            prob_timesteps = float( self.data[sku].num_timesteps) / self.num_timesteps
+            prob_utility   = float( self.info_replenish.loc[sku] ) / total_DNU
 
-            total_DNU = self.info_replenish['DAILY_NET_UTILITY'].sum()
-
-            for ( i, sku) in enumerate( self.list_of_skus ) :
-                self.list_of_sku_probs[i] = \
-                float( self.info_replenish.loc[ sku, 'DAILY_NET_UTILITY'] ) / total_DNU
+            self.list_of_sku_probs[i] = ( 1.0 - fraction_utility ) * prob_timesteps \
+                                      + fraction_utility * prob_utility
 
         return
 
@@ -583,7 +579,7 @@ class Dataset :
         return
 
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-    def normalize_timeseries( self, mode = 'positive-unit') :
+    def normalize_timeseries( self, mode = 'normal') :
 
         for sku in self.list_of_skus :
             self.data[sku].normalize_inputs( mode, self.vec_power,
@@ -737,7 +733,7 @@ class SkuData :
             self.ts /= ts_std
 
         elif mode == 'positive-unit' :
-            self.ts /= ts_std
+            self.ts /= ts_mean
 
         else :
             raise ValueError( 'Invalid normalization mode!' )

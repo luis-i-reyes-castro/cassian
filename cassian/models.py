@@ -11,7 +11,7 @@ All rights reserved.
 import numpy as np
 import pandas as pd
 from keras import backend as K
-from keras.layers import Input, Dense, Dropout
+from keras.layers import Input, Dense
 from keras.layers.wrappers import TimeDistributed
 from keras.models import Model
 from keras import regularizers, optimizers
