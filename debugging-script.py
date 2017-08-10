@@ -1,12 +1,13 @@
 # -------------------------------------------------------------------------------------
-from cassian.models import CassianModel
 from cassian.data_management import Dataset
+from cassian.models import CassianModel
 
-#dataset = 'dataset-103/raw-data.pkl'
-#ds = Dataset(dataset)
+dataset = 'dataset-103/raw-data.pkl'
+ds = Dataset(dataset)
+ds.save()
 
-dataset = 'dataset-103/ready-dataset.pkl'
-cassian = CassianModel( dataset, batch_size = 16, timesteps = 90)
+#dataset = 'dataset-103/ready-dataset.pkl'
+#cassian = CassianModel( dataset, batch_size = 16, timesteps = 90)
 #
 #vec_mean = cassian.dataset.vec_mean
 #powers = 1 / vec_mean

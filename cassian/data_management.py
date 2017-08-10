@@ -546,7 +546,7 @@ class Dataset :
         for ( i, sku) in enumerate( self.list_of_skus ) :
 
             prob_timesteps = float( self.data[sku].num_timesteps) / self.num_timesteps
-            prob_utility   = float( self.info_replenish.loc[sku] ) / total_DNU
+            prob_utility   = float( daily_net_utility[sku] ) / total_DNU
 
             self.list_of_sku_probs[i] = ( 1.0 - fraction_utility ) * prob_timesteps \
                                       + fraction_utility * prob_utility
