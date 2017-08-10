@@ -62,8 +62,6 @@ class CassianModel :
         self.dense_layer_sizes = dense_layer_sizes
         self.NLPID_layer_sizes = NLPID_layer_sizes
         self.regularization    = regularization
-        # self.dropout_u         = None
-        # self.dropout_x         = None
         self.learning_rate     = learning_rate
 
         self.regularize_hard = lambda : regularizers.l1( regularization )
@@ -93,8 +91,6 @@ class CassianModel :
                            kernel_regularizer = self.regularize_hard(),
                            bias_regularizer = self.regularize_soft() )
             highest_U_vecs = layer( highest_U_vecs )
-            # highest_U_vecs = Dropout( name = 'Dropout-FF-' + str(i+1),
-            #                           rate = self.dropout_u )( highest_U_vecs )
 
         # Builds a stack of NonlinearPID layers
 
@@ -111,8 +107,7 @@ class CassianModel :
                                   vec_b_0_regularizer = self.regularize_soft(),
                                   mat_R_b_regularizer = self.regularize_hard(),
                                   mat_W_p_regularizer = self.regularize_hard(),
-                                  mat_W_i_regularizer = self.regularize_hard(),
-                                  mat_W_d_regularizer = self.regularize_hard() )
+                                  mat_W_i_regularizer = self.regularize_hard() )
             highest_X_vecs = layer( [ highest_U_vecs, highest_X_vecs] )
 
         # Builds the list of outputs.
