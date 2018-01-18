@@ -129,10 +129,10 @@ class DatabaseClient :
             # B - Estado post-T que indica que al final del mes no habra
             #     mas registros del producto en ninguna de las sucursales.
 
-            good_rows = group_of_rows['STATE_FLAG'] == 'A'
+            good_rows = group_of_rows['STATE_FLAG'].isin(['A', 'M','N'])
 
             if pd.Series.any( good_rows ) :
-                blacklist = [ 'S', 'I', 'T', 'B']
+                blacklist = [ 'S' ]
                 rows__ = group_of_rows['STATE_FLAG'].isin( blacklist)
                 return not pd.Series.any( rows__ )
 
@@ -143,16 +143,18 @@ class DatabaseClient :
         df = df.groupby( [ 'SKU_A', 'SKU_B'] ).filter( assert_active_sku)
         df = df[ [ 'SKU_A', 'SKU_B'] ].drop_duplicates()
 
-        preselected_skus = df['SKU_A'].tolist()
+        preselected_skus = df['SKU_B'].tolist()
         self.dic_replacements[ '[PRESELECTED_SKUS]' ] = str( tuple(preselected_skus) )
 
         df_timeseries = self.execute_download_phase( 2, reuse_downloaded_result_sets)
         df_sku_info   = self.execute_download_phase( 3, reuse_downloaded_result_sets)
+        df_sku_inv   = self.execute_download_phase( 4, reuse_downloaded_result_sets)
 
         data_object = {}
         data_object['store-id']   = self.store_id
         data_object['sku-info']   = df_sku_info
         data_object['timeseries'] = df_timeseries
+        data_object['inventory'] = df_sku_inv
 
         print( 'Saving data to file:', self.output_file)
         serialize( data_object, self.output_file)
@@ -173,6 +175,8 @@ class DatabaseClient :
             print( 'Current task: Fetching SKU timeseries (i.e. dynamic info)' )
         if phase == 3 :
             print( 'Current task: Fetching SKU static information' )
+        if phase == 4 :
+            print( 'Current task: Fetching SKU invetory check information' )
 
         df_file_path = self.output_dir + 'raw_phase-' + str(phase) + '.pkl'
 
